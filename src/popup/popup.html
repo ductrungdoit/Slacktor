@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Slacktor</title>
+    <link rel="stylesheet" href="./popup.css" />
+    <script type="module" src="./popup.ts"></script>
+  </head>
+  <body>
+    <main class="popup">
+      <header>
+        <div class="brand-mark">S</div>
+        <div>
+          <h1>Slacktor</h1>
+          <p id="connection-status" class="status">Checking configuration...</p>
+        </div>
+      </header>
+
+      <section class="intro">
+        <strong>Translation stays under your control</strong>
+        <span>Enable auto-translate to translate detected user messages automatically.</span>
+      </section>
+
+      <form id="quick-settings">
+        <label>
+          AI endpoint
+          <input id="base-url" type="url" placeholder="https://api.example.com/v1" required />
+        </label>
+        <label>
+          Model
+          <input id="model" type="text" placeholder="gpt-4o-mini" required />
+        </label>
+        <label>
+          API key
+          <span class="key-field">
+            <input id="api-key" type="password" placeholder="sk-..." required />
+            <button id="toggle-key" type="button" aria-label="Show API key">Show</button>
+          </span>
+        </label>
+        <label>
+          Translate to
+          <input id="target-language" type="text" value="Vietnamese" required />
+        </label>
+        <label class="toggle-row">
+          <input id="auto-translate" type="checkbox" />
+          <span><strong>Auto-translate messages</strong><small>System, bot, and deleted messages stay excluded.</small></span>
+        </label>
+
+        <p id="save-status" class="save-status" role="status"></p>
+        <button class="save" type="submit">Save configuration</button>
+        <button id="retranslate-visible" class="secondary" type="button">Clear cache and retranslate visible messages</button>
+      </form>
+
+      <footer>
+        <button id="open-options" type="button">Open full settings</button>
+        <span>v0.1.0</span>
+      </footer>
+    </main>
+  </body>
+</html>

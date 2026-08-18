@@ -1,0 +1,92 @@
+:root {
+  color: #1d1c1d;
+  background: #ffffff;
+  font-family: "Slack-Lato", "Helvetica Neue", Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body { margin: 0; width: 350px; }
+
+.popup { padding: 18px; }
+
+header { align-items: center; display: flex; gap: 10px; margin-bottom: 16px; }
+
+.brand-mark {
+  align-items: center;
+  background: #4a154b;
+  border-radius: 10px;
+  color: #ffffff;
+  display: flex;
+  font-size: 18px;
+  font-weight: 800;
+  height: 36px;
+  justify-content: center;
+  width: 36px;
+}
+
+h1 { font-size: 17px; line-height: 1.1; margin: 0; }
+
+.status { color: #616061; font-size: 12px; margin: 3px 0 0; }
+.status.ready { color: #007a5a; }
+.status.missing { color: #a54700; }
+
+.intro {
+  background: #f4f1f4;
+  border-left: 3px solid #4a154b;
+  display: grid;
+  font-size: 12px;
+  gap: 3px;
+  line-height: 1.4;
+  margin-bottom: 16px;
+  padding: 10px;
+}
+
+form { display: grid; gap: 12px; }
+
+label { color: #1d1c1d; display: grid; font-size: 12px; font-weight: 700; gap: 5px; }
+
+input {
+  background: #ffffff;
+  border: 1px solid #868686;
+  border-radius: 4px;
+  color: #1d1c1d;
+  font: 13px/1.3 inherit;
+  min-width: 0;
+  outline: none;
+  padding: 8px;
+  width: 100%;
+}
+
+input:focus { border-color: #1264a3; box-shadow: 0 0 0 1px #1264a3; }
+
+.toggle-row { align-items: start; display: flex; font-weight: 400; gap: 8px; }
+.toggle-row input { accent-color: #007a5a; margin: 2px 0 0; width: auto; }
+.toggle-row strong, .toggle-row small { display: block; }
+.toggle-row small { color: #616061; font-size: 11px; font-weight: 400; margin-top: 2px; }
+
+.key-field { display: flex; gap: 6px; }
+.key-field button, footer button { background: transparent; border: 0; color: #1264a3; cursor: pointer; font: 12px inherit; padding: 0; white-space: nowrap; }
+.key-field button { padding: 0 2px; }
+
+.save {
+  background: #007a5a;
+  border: 0;
+  border-radius: 4px;
+  color: #ffffff;
+  cursor: pointer;
+  font: 13px inherit;
+  font-weight: 700;
+  padding: 9px 12px;
+}
+.save:hover { background: #006c50; }
+
+.secondary { background: #ffffff; border: 1px solid #1264a3; border-radius: 4px; color: #1264a3; cursor: pointer; font: 12px inherit; padding: 8px 10px; }
+.secondary:hover { background: #f0f7fc; }
+
+.save-status { font-size: 12px; margin: -3px 0 0; min-height: 16px; }
+.save-status.error { color: #c4314b; }
+.save-status.success { color: #007a5a; }
+
+footer { border-top: 1px solid #dddddd; display: flex; font-size: 11px; justify-content: space-between; margin-top: 16px; padding-top: 12px; }
+footer span { color: #868686; }

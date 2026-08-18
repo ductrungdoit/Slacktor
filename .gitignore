@@ -1,0 +1,19 @@
+# Dependencies and generated extension bundles
+node_modules/
+dist/
+
+# Local environment and editor files
+.env
+.env.*
+!.env.example
+.vscode/
+.idea/
+
+# Test output and logs
+coverage/
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
