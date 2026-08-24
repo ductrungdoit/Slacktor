@@ -11,13 +11,13 @@ the original Slack message without changing Slack data.
   rich-text messages, lists, and block-kit content.
 - Filters out system activity, deleted messages, automated notices, bots, and
   Slack apps.
-- Up to 8 translation requests run in parallel.
+- Up to 10 translation requests run in parallel.
 - Priority icon for queued messages.
 - Per-message reload icon to bypass cache and translate again.
 - Seven-day translation cache in IndexedDB.
 - Thread-aware context stored in IndexedDB for 30 days after thread activity.
 - Hybrid context for long threads: raw recent messages plus a rolling summary.
-- `CheckContext(url)` debug command from Slack DevTools Console.
+- Explicit in-extension consent before Slack messages are read or processed.
 
 ## Install For Development
 
@@ -38,15 +38,16 @@ After code changes, run `npm run build`, click Reload for Slacktor in
 ## Configure AI
 
 1. Click the pinned Slacktor icon.
-2. Fill in:
+2. Review and accept the Slack data disclosure.
+3. Open Settings and fill in:
    - **AI endpoint**: an OpenAI-compatible base URL, for example
      `https://api.openai.com/v1`.
    - **Model**: for example `gpt-4o-mini`.
    - **API key**.
    - **Translate to**: for example `Vietnamese`.
-3. Enable **Auto-translate messages** if desired.
-4. Click **Save configuration**.
-5. Approve Chrome's requested permission for that exact AI endpoint origin.
+4. Enable **Auto-translate messages** if desired.
+5. Click **Save configuration**.
+6. Approve Chrome's requested permission for that exact AI endpoint origin.
 
 The API key is restricted to trusted extension contexts. Slack content scripts
 do not receive the key; only the background service worker calls the AI API.
@@ -95,27 +96,11 @@ Changing the message, provider/model, output language, or context produces a
 new cache key. Identical in-flight requests are deduplicated so Slacktor does
 not call the AI provider twice for the same translation.
 
-## Debug Thread Context
-
-Open Slack DevTools with `F12`, then run:
-
-```js
-CheckContext("https://workspace.slack.com/archives/C01234567/p1785312156202579")
-  .then(console.log)
-```
-
-Use a permalink for a thread reply rather than the root when checking selected
-context. The result includes:
-
-- `target`: stored target message.
-- `context`: the raw thread messages selected for context inspection.
-- `storedThreadMessages`: messages currently stored for the thread.
-- `threadRootTs` and `threadKey`: detected thread identity.
-- `reason`: why context could not be selected, if applicable.
-
 ## Data And Privacy
 
 - Slacktor does not modify Slack's server-side data.
+- Slacktor does not read or store Slack messages until the user accepts the
+  in-extension data disclosure.
 - Text is sent to the configured AI endpoint only for requested or enabled
   automatic translations.
 - System, app, bot, automated, and deleted messages are excluded before they
@@ -134,4 +119,5 @@ The build checks TypeScript and produces a loadable extension in `dist/`.
 Architecture decisions and debugging details are available in:
 
 - `docs/architecture.md`
-- `docs/debug-context.md`
+- `docs/privacy-policy.html`
+- `docs/store-listing.md`
