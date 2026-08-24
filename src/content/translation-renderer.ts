@@ -10,6 +10,7 @@ export type TranslationController = {
   markQueued: (prioritize: () => void) => void
   markPrioritized: () => void
   retranslate: () => Promise<void>
+  cancel: () => void
 }
 
 type ContextLoader = () => Promise<ThreadContextPlan>
@@ -131,6 +132,10 @@ export function renderPlaceholder(
       showSpinner()
     },
     retranslate: () => translate(true),
+    cancel() {
+      translating = false
+      showRetry("Translation stopped.")
+    },
   }
 }
 

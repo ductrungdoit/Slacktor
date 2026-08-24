@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Slacktor Privacy Policy</title>
+  <style>
+    body { color: #1d1c1d; font: 16px/1.6 system-ui, sans-serif; margin: 0 auto; max-width: 780px; padding: 32px 20px 64px; }
+    h1, h2 { color: #4a154b; line-height: 1.25; }
+    a { color: #1264a3; }
+    code { background: #f4f1f4; padding: 2px 5px; }
+  </style>
+</head>
+<body>
+  <h1>Slacktor Privacy Policy</h1>
+  <p>Last updated: August 24, 2026</p>
+  <p>Slacktor is a browser extension that translates messages displayed in Slack Web using an AI endpoint selected and configured by the user.</p>
+  <h2>Data Slacktor Handles</h2>
+  <ul>
+    <li>Slack message text, thread context, message/channel identifiers, author display names, and timestamps needed for translation.</li>
+    <li>Text entered into Quick Translator.</li>
+    <li>The AI endpoint, model, API key, target language, consent, and extension settings entered by the user.</li>
+    <li>Local operational logs containing request metadata and errors. Logs do not include API keys or message text.</li>
+  </ul>
+  <h2>Use and Transmission</h2>
+  <p>Slacktor uses data only to translate content, improve translation with thread context, cache results locally, maintain local history/context, and display diagnostics.</p>
+  <p>When translation is enabled or requested, the target text and applicable context are sent to the AI endpoint configured by the user. Slacktor does not operate a developer-owned backend server, and the developer does not receive this data.</p>
+  <p>Remote AI endpoints must use HTTPS. Plain HTTP is supported only for local endpoints on <code>localhost</code> or <code>127.0.0.1</code>.</p>
+  <h2>Local Storage and Retention</h2>
+  <ul>
+    <li>Settings and API keys are stored in Chrome local extension storage.</li>
+    <li>Thread context is retained locally for up to 30 days after observed activity.</li>
+    <li>Translation cache entries are retained locally for up to 7 days.</li>
+    <li>Quick Translator history and diagnostic logs are local and can be cleared in the UI.</li>
+  </ul>
+  <h2>Sharing and Limited Use</h2>
+  <p>Slacktor does not sell data or use it for advertising, profiling, credit purposes, or developer human review. Data is transferred only to the user-selected AI endpoint as necessary for translation.</p>
+  <p>Slacktor's use of information received from Chrome APIs complies with the Chrome Web Store User Data Policy, including the Limited Use requirements.</p>
+  <h2>User Controls</h2>
+  <p>Users can disable automatic translation, stop active requests, clear translation cache, history, and logs, or remove the extension to delete local extension data.</p>
+  <h2>Contact</h2>
+  <p><a href="mailto:ductrung.do.it@gmail.com">ductrung.do.it@gmail.com</a></p>
+</body>
+</html>

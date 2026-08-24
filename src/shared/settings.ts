@@ -4,6 +4,7 @@ export type ProviderSettings = {
   model: string
   targetLanguage: string
   autoTranslate: boolean
+  privacyConsent: boolean
 }
 
 const SETTINGS_KEY = "provider-settings"
@@ -14,6 +15,7 @@ export const DEFAULT_PROVIDER_SETTINGS: ProviderSettings = {
   model: "",
   targetLanguage: "Vietnamese",
   autoTranslate: false,
+  privacyConsent: false,
 }
 
 export async function getProviderSettings(): Promise<ProviderSettings> {

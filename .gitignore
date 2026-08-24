@@ -1,6 +1,7 @@
 # Dependencies and generated extension bundles
 node_modules/
 dist/
+release/
 
 # Local environment and editor files
 .env

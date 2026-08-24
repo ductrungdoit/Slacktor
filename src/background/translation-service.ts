@@ -5,14 +5,17 @@ import {
   getCachedTranslation,
   getTranslationCacheId,
 } from "./translation-cache"
+import { safeEndpoint, writeLog } from "./log-store"
 
-const MAX_ATTEMPTS = 3
+const MAX_ATTEMPTS = 2
 const inFlightTranslations = new Map<string, Promise<string>>()
 
 export async function translateMessage(
   message: RawSlackMessage,
   context: ThreadContextPlan = { recentMessages: [] },
   forceRefresh = false,
+  signal?: AbortSignal,
+  onRetryStateChange?: (retrying: boolean) => void,
 ): Promise<string> {
   const settings = await getProviderSettings()
   if (!settings.baseUrl || !settings.apiKey || !settings.model) {
@@ -30,7 +33,7 @@ export async function translateMessage(
     if (pending) return pending
   }
 
-  const request = requestTranslation(message, context, settings)
+  const request = requestTranslation(message, context, settings, signal, onRetryStateChange)
   if (!forceRefresh) inFlightTranslations.set(requestId, request)
   try {
     return await request
@@ -43,6 +46,8 @@ async function requestTranslation(
   message: RawSlackMessage,
   context: ThreadContextPlan,
   settings: Awaited<ReturnType<typeof getProviderSettings>>,
+  signal?: AbortSignal,
+  onRetryStateChange?: (retrying: boolean) => void,
 ): Promise<string> {
 
   const baseUrl = settings.baseUrl.replace(/\/+$/, "")
@@ -63,18 +68,38 @@ async function requestTranslation(
     ],
     temperature: 0.2,
   }
-  const response = await requestWithRetry(endpoint, settings.apiKey, payload)
+  await writeLog({
+    level: "info",
+    scope: "translation",
+    message: "Translation request started",
+    details: { endpoint: safeEndpoint(endpoint), model: settings.model },
+  })
+  let response: Response
+  try {
+    response = await requestWithRetry(endpoint, settings.apiKey, payload, signal, onRetryStateChange)
+  } catch (error) {
+    await writeLog({
+      level: "error",
+      scope: "translation",
+      message: error instanceof Error ? error.message : "Translation network request failed",
+      details: { endpoint: safeEndpoint(endpoint), model: settings.model },
+    })
+    throw error
+  }
 
   if (!response.ok) {
     const body = (await response.text()).replace(/\s+/g, " ").trim()
     const detail = body ? `: ${body.slice(0, 240)}` : ""
-    throw new Error(`AI request failed (${response.status})${detail}`)
+    const error = `AI request failed (${response.status})${detail}`
+    await writeLog({ level: "error", scope: "translation", message: error, details: { endpoint: safeEndpoint(endpoint), model: settings.model, status: response.status } })
+    throw new Error(error)
   }
 
   const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> }
   const translation = data.choices?.[0]?.message?.content?.trim()
   if (!translation) throw new Error("AI provider returned no translation.")
   await cacheTranslation(message, settings, translation, context)
+  await writeLog({ level: "info", scope: "translation", message: "Translation request completed", details: { endpoint: safeEndpoint(endpoint), model: settings.model, status: response.status } })
   return translation
 }
 
@@ -82,6 +107,8 @@ async function requestWithRetry(
   endpoint: string,
   apiKey: string,
   payload: unknown,
+  signal?: AbortSignal,
+  onRetryStateChange?: (retrying: boolean) => void,
 ): Promise<Response> {
   let lastError: unknown
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
@@ -93,15 +120,26 @@ async function requestWithRetry(
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify(payload),
+        signal,
       })
       if (response.ok || !isRetriableStatus(response.status) || attempt === MAX_ATTEMPTS - 1) {
         return response
       }
-      await delay(retryDelayMs(attempt))
+      onRetryStateChange?.(true)
+      try {
+        await delay(retryDelayMs(attempt), signal)
+      } finally {
+        onRetryStateChange?.(false)
+      }
     } catch (error) {
       lastError = error
       if (attempt === MAX_ATTEMPTS - 1) break
-      await delay(retryDelayMs(attempt))
+      onRetryStateChange?.(true)
+      try {
+        await delay(retryDelayMs(attempt), signal)
+      } finally {
+        onRetryStateChange?.(false)
+      }
     }
   }
   throw lastError instanceof Error ? lastError : new Error("AI request failed after retries.")
@@ -115,8 +153,14 @@ function retryDelayMs(attempt: number): number {
   return 400 * 2 ** attempt + Math.floor(Math.random() * 200)
 }
 
-function delay(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds))
+function delay(milliseconds: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(resolve, milliseconds)
+    signal?.addEventListener("abort", () => {
+      clearTimeout(timeout)
+      reject(new DOMException("Translation terminated.", "AbortError"))
+    }, { once: true })
+  })
 }
 
 function buildTranslationPrompt(

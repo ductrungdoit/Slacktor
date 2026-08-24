@@ -4,6 +4,7 @@ export type PublicSettings = {
   targetLanguage: string
   configured: boolean
   autoTranslate: boolean
+  privacyConsent: boolean
 }
 
 export type TranslateRequest = {
@@ -31,10 +32,29 @@ export type GetThreadContextRequest = {
   message: RawSlackMessage
 }
 
-export type InspectThreadContextRequest = {
-  type: "inspect-thread-context"
-  url: string
+export type QuickTranslateRequest = {
+  type: "quick-translate"
+  text: string
 }
+
+export type GetLogsRequest = { type: "get-logs" }
+export type ClearLogsRequest = { type: "clear-logs" }
+export type UpdateSlackTranslationStatsRequest = {
+  type: "update-slack-translation-stats"
+  waiting: number
+  active: number
+  concurrency: number
+  completed: number
+  total: number
+}
+export type GetSlackTranslationStatsRequest = {
+  type: "get-slack-translation-stats"
+  tabId?: number
+}
+export type GetProviderRuntimeStatusRequest = { type: "get-provider-runtime-status" }
+export type TestProviderRequest = { type: "test-provider" }
+export type RetranslateVisibleRequest = { type: "retranslate-visible-from-popup" }
+export type TerminateSlackTranslationsRequest = { type: "terminate-slack-translations" }
 
 export type ExtensionRequest =
   | TranslateRequest
@@ -42,12 +62,24 @@ export type ExtensionRequest =
   | ClearCacheAndRetranslateRequest
   | ObserveMessageRequest
   | GetThreadContextRequest
-  | InspectThreadContextRequest
+  | QuickTranslateRequest
+  | GetLogsRequest
+  | ClearLogsRequest
+  | UpdateSlackTranslationStatsRequest
+  | GetSlackTranslationStatsRequest
+  | GetProviderRuntimeStatusRequest
+  | TestProviderRequest
+  | RetranslateVisibleRequest
+  | TerminateSlackTranslationsRequest
 
-export type ContentRequest = {
-  type: "retranslate-visible"
-}
+export type ContentRequest =
+  | { type: "retranslate-visible" }
+  | { type: "terminate-slack-translations" }
 
 export type TranslateResponse =
   | { ok: true; translation: string }
+  | { ok: false; error: string }
+
+export type QuickTranslateResponse =
+  | { ok: true; japanese: string; english: string }
   | { ok: false; error: string }

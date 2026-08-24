@@ -10,9 +10,16 @@ import type { PublicSettings } from "../shared/messages"
 import type { ContentRequest } from "../shared/messages"
 import type { ThreadContextPlan } from "../shared/types"
 
-let settings: PublicSettings = { targetLanguage: "Vietnamese", configured: false, autoTranslate: false }
+let settings: PublicSettings = {
+  targetLanguage: "Vietnamese",
+  configured: false,
+  autoTranslate: false,
+  privacyConsent: false,
+}
 let activeTranslations = 0
-const MAX_CONCURRENT_TRANSLATIONS = 8
+const MAX_CONCURRENT_TRANSLATIONS = 10
+let completedTranslations = 0
+let totalTranslations = 0
 type QueuedTranslation = {
   controller: TranslationController
   started: boolean
@@ -23,6 +30,7 @@ const controllers = new Map<string, TranslationController>()
 
 async function inspect(node: HTMLElement): Promise<void> {
   try {
+    if (!settings.privacyConsent) return
     const message = extractMessage(node)
     const anchor = getTranslationAnchor(node)
     if (message && anchor) {
@@ -35,9 +43,15 @@ async function inspect(node: HTMLElement): Promise<void> {
       })
       if (controller) controllers.set(message.messageId, controller)
       if (controller && settings.configured && settings.autoTranslate) {
+        if (activeTranslations === 0 && autoTranslationQueue.length === 0) {
+          completedTranslations = 0
+          totalTranslations = 0
+        }
+        totalTranslations += 1
         const job: QueuedTranslation = { controller, started: false }
         autoTranslationQueue.push(job)
         controller.markQueued(() => prioritize(job))
+        publishQueueStats()
         runAutoTranslationQueue()
       }
     }
@@ -61,6 +75,7 @@ function prioritize(job: QueuedTranslation): void {
     autoTranslationQueue.splice(index, 1)
     autoTranslationQueue.unshift(job)
   }
+  publishQueueStats()
   runAutoTranslationQueue()
 }
 
@@ -71,14 +86,18 @@ function runAutoTranslationQueue(): void {
 
     job.started = true
     activeTranslations += 1
+    publishQueueStats()
     void job.controller.run().finally(() => {
       activeTranslations = Math.max(0, activeTranslations - 1)
+      completedTranslations = Math.min(totalTranslations, completedTranslations + 1)
+      publishQueueStats()
       runAutoTranslationQueue()
     })
   }
 }
 
 export function startMessageObserver(): MutationObserver {
+  publishQueueStats()
   void loadSettingsAndInspect()
 
   const observer = new MutationObserver((records) => {
@@ -92,24 +111,68 @@ export function startMessageObserver(): MutationObserver {
   })
 
   observer.observe(document.body, { childList: true, subtree: true })
-  window.addEventListener("pagehide", () => observer.disconnect(), { once: true })
+  window.addEventListener("pagehide", () => {
+    observer.disconnect()
+    activeTranslations = 0
+    autoTranslationQueue.length = 0
+    publishQueueStats()
+  }, { once: true })
 
   chrome.runtime.onMessage.addListener((request: ContentRequest) => {
-    if (request.type !== "retranslate-visible") return
-    for (const node of findMessageNodes()) {
-      const message = extractMessage(node)
-      if (!message || !node.getBoundingClientRect().height) continue
-      void controllers.get(message.messageId)?.retranslate()
+    if (request.type === "retranslate-visible") {
+      for (const node of findMessageNodes()) {
+        const message = extractMessage(node)
+        if (!message || !node.getBoundingClientRect().height) continue
+        const controller = controllers.get(message.messageId)
+        if (!controller) continue
+
+        if (activeTranslations === 0 && autoTranslationQueue.length === 0) {
+          completedTranslations = 0
+          totalTranslations = 0
+        }
+        totalTranslations += 1
+        const job: QueuedTranslation = {
+          controller: {
+            ...controller,
+            run: controller.retranslate,
+          },
+          started: false,
+        }
+        autoTranslationQueue.push(job)
+        controller.markQueued(() => prioritize(job))
+      }
+      publishQueueStats()
+      runAutoTranslationQueue()
+      return
+    }
+
+    if (request.type === "terminate-slack-translations") {
+      autoTranslationQueue.length = 0
+      activeTranslations = 0
+      for (const controller of controllers.values()) controller.cancel()
+      publishQueueStats()
     }
   })
 
   return observer
 }
 
+function publishQueueStats(): void {
+  void sendMessageSafely({
+    type: "update-slack-translation-stats",
+    waiting: autoTranslationQueue.length,
+    active: activeTranslations,
+    concurrency: MAX_CONCURRENT_TRANSLATIONS,
+    completed: completedTranslations,
+    total: totalTranslations,
+  })
+}
+
 async function loadSettingsAndInspect(): Promise<void> {
   try {
     const response = await sendMessageSafely<PublicSettings>({ type: "get-public-settings" })
     if (response) settings = response
+    if (!settings.privacyConsent) return
     for (const node of findMessageNodes()) void inspect(node)
   } catch (error) {
     if (!isContextInvalidated(error)) throw error

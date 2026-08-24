@@ -5,9 +5,13 @@ const manifest: ManifestV3Export = {
   name: "Slacktor",
   version: "0.1.0",
   description: "AI translation overlay for Slack Web.",
-  permissions: ["storage", "tabs"],
+  permissions: ["storage"],
   host_permissions: ["https://app.slack.com/*"],
-  optional_host_permissions: ["http://*/*", "https://*/*"],
+  optional_host_permissions: [
+    "https://*/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+  ],
   background: {
     service_worker: "src/background/service-worker.ts",
     type: "module",
@@ -19,17 +23,22 @@ const manifest: ManifestV3Export = {
       run_at: "document_idle",
     },
   ],
-  web_accessible_resources: [
-    {
-      resources: ["debug-bridge.js"],
-      matches: ["https://app.slack.com/*"],
-    },
-  ],
   action: {
     default_title: "Slacktor",
     default_popup: "src/popup/popup.html",
+    default_icon: {
+      16: "icons/icon-16.png",
+      32: "icons/icon-32.png",
+      48: "icons/icon-48.png",
+      128: "icons/icon-128.png",
+    },
   },
-  options_page: "src/options/options.html",
+  icons: {
+    16: "icons/icon-16.png",
+    32: "icons/icon-32.png",
+    48: "icons/icon-48.png",
+    128: "icons/icon-128.png",
+  },
 }
 
 export default manifest
