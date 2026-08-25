@@ -172,7 +172,7 @@ chrome.runtime.onMessage.addListener((request: ExtensionRequest, _sender, sendRe
   }
 
   if (request.type === "test-provider") {
-    void testProvider()
+    void testProvider(request.settings)
       .then(() => {
         providerRuntimeStatus = { state: "ready", message: "Provider test succeeded" }
         sendResponse({ ok: true })

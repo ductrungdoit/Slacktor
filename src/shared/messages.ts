@@ -1,4 +1,5 @@
 import type { RawSlackMessage, ThreadContextPlan } from "./types"
+import type { ProviderSettings } from "./settings"
 
 export type PublicSettings = {
   targetLanguage: string
@@ -52,7 +53,10 @@ export type GetSlackTranslationStatsRequest = {
   tabId?: number
 }
 export type GetProviderRuntimeStatusRequest = { type: "get-provider-runtime-status" }
-export type TestProviderRequest = { type: "test-provider" }
+export type TestProviderRequest = {
+  type: "test-provider"
+  settings: ProviderSettings
+}
 export type RetranslateVisibleRequest = { type: "retranslate-visible-from-popup" }
 export type TerminateSlackTranslationsRequest = { type: "terminate-slack-translations" }
 

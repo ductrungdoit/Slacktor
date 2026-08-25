@@ -1,4 +1,4 @@
-import { getProviderSettings } from "../shared/settings"
+import { getProviderSettings, type ProviderSettings } from "../shared/settings"
 import { safeEndpoint, writeLog } from "./log-store"
 
 export async function quickTranslate(text: string): Promise<{ japanese: string; english: string }> {
@@ -12,8 +12,7 @@ export async function quickTranslate(text: string): Promise<{ japanese: string; 
   return { japanese, english }
 }
 
-export async function testProvider(): Promise<void> {
-  const settings = await getProviderSettings()
+export async function testProvider(settings: ProviderSettings): Promise<void> {
   if (!settings.baseUrl || !settings.apiKey || !settings.model) {
     throw new Error("Configure endpoint, model, and API key first.")
   }

@@ -1,4 +1,4 @@
-import { getProviderSettings, saveProviderSettings } from "../shared/settings"
+import { getProviderSettings, saveProviderSettings, type ProviderSettings } from "../shared/settings"
 import type { QuickTranslateResponse } from "../shared/messages"
 import type { SlacktorLogEntry } from "../background/log-store"
 
@@ -144,43 +144,26 @@ form.addEventListener("submit", (event) => {
   saveStatus.className = "save-status"
   saveStatus.textContent = "Saving..."
 
-  const endpoint = baseUrl.value.trim()
-  let permissionPattern: string
   try {
-    const url = new URL(endpoint)
-    const isLocalHttp = url.protocol === "http:" && (
-      url.hostname === "localhost" || url.hostname === "127.0.0.1"
-    )
-    if (url.protocol !== "https:" && !isLocalHttp) {
-      throw new Error("Remote AI endpoints must use HTTPS.")
-    }
-    permissionPattern = `${url.protocol}//${url.hostname}/*`
-  } catch {
+    const settings = getDraftProviderSettings()
+    void requestProviderPermission(settings.baseUrl).then(() => saveProviderSettings(settings))
+      .then(() => {
+        updateConnectionStatus()
+        saveStatus.className = "save-status success"
+        saveStatus.textContent = "Configuration saved."
+      })
+      .catch((error: unknown) => {
+        saveStatus.className = "save-status error"
+        saveStatus.textContent = error instanceof Error
+          ? error.message
+          : "Could not save configuration or endpoint permission was denied."
+      })
+  } catch (error: unknown) {
     saveStatus.className = "save-status error"
-    saveStatus.textContent = "Use an HTTPS endpoint, or HTTP on localhost only."
-    return
+    saveStatus.textContent = error instanceof Error
+      ? error.message
+      : "Could not validate the provider configuration."
   }
-
-  void chrome.permissions.request({ origins: [permissionPattern] }).then((granted) => {
-    if (!granted) throw new Error("Permission was not granted for this AI endpoint.")
-    return saveProviderSettings({
-      baseUrl: endpoint,
-      apiKey: apiKey.value.trim(),
-      model: model.value.trim(),
-      targetLanguage: targetLanguage.value.trim(),
-      autoTranslate: autoTranslate.checked,
-      privacyConsent,
-    })
-  })
-    .then(() => {
-      updateConnectionStatus()
-      saveStatus.className = "save-status success"
-      saveStatus.textContent = "Configuration saved."
-    })
-    .catch(() => {
-      saveStatus.className = "save-status error"
-      saveStatus.textContent = "Could not save configuration or endpoint permission was denied."
-    })
 })
 
 document.querySelector<HTMLButtonElement>("#clear-translation-cache")!.addEventListener("click", (event) => {
@@ -211,13 +194,68 @@ document.querySelector<HTMLButtonElement>("#test-provider")!.addEventListener("c
   button.disabled = true
   const original = button.textContent
   button.textContent = "Testing..."
-  chrome.runtime.sendMessage({ type: "test-provider" }, (response?: { ok: boolean; error?: string }) => {
-    button.disabled = false
-    button.textContent = response?.ok ? "Test succeeded" : "Test failed"
-    window.setTimeout(() => { button.textContent = original }, 1400)
-    void refreshProviderRuntimeStatus()
-  })
+  saveStatus.className = "save-status"
+  saveStatus.textContent = "Testing current configuration..."
+
+  let succeeded = false
+  void Promise.resolve()
+    .then(async () => {
+      const settings = getDraftProviderSettings()
+      await requestProviderPermission(settings.baseUrl)
+      const response = await chrome.runtime.sendMessage({ type: "test-provider", settings }) as {
+        ok: boolean
+        error?: string
+      }
+      if (!response?.ok) throw new Error(response?.error ?? "Provider test failed.")
+      await saveProviderSettings(settings)
+      succeeded = true
+      updateConnectionStatus()
+      saveStatus.className = "save-status success"
+      saveStatus.textContent = "Provider test succeeded. Configuration saved."
+    })
+    .catch((error: unknown) => {
+      saveStatus.className = "save-status error"
+      saveStatus.textContent = error instanceof Error ? error.message : "Provider test failed."
+    })
+    .finally(() => {
+      button.disabled = false
+      button.textContent = succeeded ? "Test succeeded" : "Test failed"
+      window.setTimeout(() => { button.textContent = original }, 1400)
+      void refreshProviderRuntimeStatus()
+    })
 })
+
+function getDraftProviderSettings(): ProviderSettings {
+  const settings = {
+    baseUrl: baseUrl.value.trim(),
+    apiKey: apiKey.value.trim(),
+    model: model.value.trim(),
+    targetLanguage: targetLanguage.value.trim(),
+    autoTranslate: autoTranslate.checked,
+    privacyConsent,
+  }
+  if (!settings.baseUrl || !settings.apiKey || !settings.model || !settings.targetLanguage) {
+    throw new Error("Enter endpoint, model, API key, and target language first.")
+  }
+  return settings
+}
+
+async function requestProviderPermission(endpoint: string): Promise<void> {
+  let url: URL
+  try {
+    url = new URL(endpoint)
+  } catch {
+    throw new Error("Use an HTTPS endpoint, or HTTP on localhost only.")
+  }
+  const isLocalHttp = url.protocol === "http:" && (
+    url.hostname === "localhost" || url.hostname === "127.0.0.1"
+  )
+  if (url.protocol !== "https:" && !isLocalHttp) {
+    throw new Error("Use an HTTPS endpoint, or HTTP on localhost only.")
+  }
+  const granted = await chrome.permissions.request({ origins: [`${url.protocol}//${url.host}/*`] })
+  if (!granted) throw new Error("Permission was not granted for this AI endpoint.")
+}
 
 quickTranslateButton.addEventListener("click", () => {
   const text = quickSource.value.trim()
