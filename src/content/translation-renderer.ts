@@ -6,11 +6,12 @@ const ROOT_ATTRIBUTE = "data-slacktor-translation"
 const RENDERED_ATTRIBUTE = "data-slacktor-rendered"
 
 export type TranslationController = {
-  run: () => Promise<void>
+  run: () => Promise<string | undefined>
   markQueued: (prioritize: () => void) => void
   markPrioritized: () => void
-  retranslate: () => Promise<void>
-  cancel: () => void
+  retranslate: () => Promise<string | undefined>
+  applyTranslation: (translation: string) => void
+  markStopped: () => void
 }
 
 type ContextLoader = () => Promise<ThreadContextPlan>
@@ -55,8 +56,15 @@ export function renderPlaceholder(
     result.append(createSpinner())
   }
 
-  const translate = (forceRefresh = false): Promise<void> => {
-    if (translating) return Promise.resolve()
+  const applyTranslation = (text: string) => {
+    button.remove()
+    result.style.marginLeft = "0"
+    result.textContent = text
+    result.append(createReloadButton(() => void translate(true)))
+  }
+
+  const translate = (forceRefresh = false): Promise<string | undefined> => {
+    if (translating) return Promise.resolve(undefined)
     translating = true
     button.disabled = true
     showSpinner()
@@ -67,18 +75,17 @@ export function renderPlaceholder(
       .then((response) => {
         if (!response?.ok) {
           showRetry(response?.error ?? "Translation failed.")
-          return
+          return undefined
         }
 
-        button.remove()
-        result.style.marginLeft = "0"
-        result.textContent = response.translation
-        result.append(createReloadButton(() => void translate(true)))
+        applyTranslation(response.translation)
+        return response.translation
       })
       .catch((error: unknown) => {
         // Reloading the extension destroys an in-flight content-script context.
         // Avoid emitting an uncaught error from the old renderer instance.
         if (!isContextInvalidated(error)) showRetry("Translation failed.")
+        return undefined
       })
       .finally(() => {
         translating = false
@@ -132,9 +139,15 @@ export function renderPlaceholder(
       showSpinner()
     },
     retranslate: () => translate(true),
-    cancel() {
-      translating = false
-      showRetry("Translation stopped.")
+    applyTranslation,
+    markStopped() {
+      prioritize = undefined
+      result.textContent = "Translation stopped."
+      button.disabled = false
+      button.style.display = "inline"
+      button.innerHTML = "&#8635;"
+      button.title = "Retranslate message"
+      button.setAttribute("aria-label", "Retranslate message")
     },
   }
 }

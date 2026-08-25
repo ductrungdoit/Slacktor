@@ -58,7 +58,8 @@ export function findMessageNodes(root: ParentNode = document): HTMLElement[] {
 export function extractMessage(node: HTMLElement): RawSlackMessage | undefined {
   if (isSystemOrDisplayNode(node)) return undefined
 
-  const messageId = node.dataset.messageId ?? node.dataset.msgTs ?? node.dataset.ts ?? findMessageId(node)
+  const timestamp = findMessageTimestamp(node)
+  const messageId = node.dataset.messageId ?? timestamp ?? findMessageId(node)
   if (!messageId) return undefined
 
   const textNode = getTextNode(node)
@@ -76,7 +77,7 @@ export function extractMessage(node: HTMLElement): RawSlackMessage | undefined {
     conversationId: node.dataset.msgChannelId ?? node.dataset.channelId,
     threadRootTs,
     messageId,
-    timestamp: node.dataset.msgTs ?? node.dataset.ts,
+    timestamp,
     messageKind: threadRootTs ? "thread-reply" : "unknown",
     author,
     sourceText,
@@ -119,6 +120,32 @@ function getTextNode(node: HTMLElement): HTMLElement | undefined {
 function findMessageId(node: HTMLElement): string | undefined {
   return node.querySelector<HTMLElement>("[data-message-id], [data-ts]")?.dataset.messageId
     ?? node.querySelector<HTMLElement>("[data-message-id], [data-ts]")?.dataset.ts
+}
+
+function findMessageTimestamp(node: HTMLElement): string | undefined {
+  const permalink = node.querySelector<HTMLAnchorElement>("a.c-timestamp[href*='/p']")?.href
+  if (permalink) {
+    try {
+      const match = new URL(permalink).pathname.match(/\/p(\d{10})(\d{6})(?:\/|$)/)
+      if (match) return `${match[1]}.${match[2]}`
+    } catch {
+      // Fall back to Slack's nested timestamp attributes.
+    }
+  }
+
+  const direct = node.dataset.msgTs ?? node.dataset.ts
+  if (direct) return normalizeSlackTimestamp(direct)
+
+  // Thread wrappers can contain data-ts values for the thread root. Only use
+  // this broad fallback when the message's own timestamp permalink is absent.
+  const nested = node.querySelector<HTMLElement>("[data-msg-ts], [data-ts]")
+  const nestedTimestamp = nested?.dataset.msgTs ?? nested?.dataset.ts
+  return nestedTimestamp ? normalizeSlackTimestamp(nestedTimestamp) : undefined
+}
+
+function normalizeSlackTimestamp(value: string): string {
+  const permalinkMatch = value.match(/^p(\d{10})(\d{6})$/)
+  return permalinkMatch ? `${permalinkMatch[1]}.${permalinkMatch[2]}` : value
 }
 
 function extractThreadRootFromPermalink(node: HTMLElement): string | undefined {

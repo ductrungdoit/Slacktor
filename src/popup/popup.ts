@@ -39,9 +39,14 @@ type QuickHistoryEntry = {
   english: string
   createdAt: number
 }
-type QuickUiState = { draft: string; clearOnNextOpen: boolean; history: QuickHistoryEntry[] }
+type QuickUiState = {
+  draft: string
+  clearAfterClose: boolean
+  lastTranslatedSource?: string
+  history: QuickHistoryEntry[]
+}
 const QUICK_UI_KEY = "quick-translator-ui"
-let quickUiState: QuickUiState = { draft: "", clearOnNextOpen: false, history: [] }
+let quickUiState: QuickUiState = { draft: "", clearAfterClose: false, history: [] }
 
 void Promise.all([load(), loadQuickUiState()])
 void refreshSlackApiStats()
@@ -66,9 +71,14 @@ async function load(): Promise<void> {
 async function loadQuickUiState(): Promise<void> {
   const stored = await chrome.storage.local.get(QUICK_UI_KEY)
   quickUiState = { ...quickUiState, ...stored[QUICK_UI_KEY] }
-  if (quickUiState.clearOnNextOpen) {
+  if (
+    quickUiState.clearAfterClose &&
+    quickUiState.lastTranslatedSource !== undefined &&
+    quickUiState.draft === quickUiState.lastTranslatedSource
+  ) {
     quickUiState.draft = ""
-    quickUiState.clearOnNextOpen = false
+    quickUiState.clearAfterClose = false
+    quickUiState.lastTranslatedSource = undefined
     await saveQuickUiState()
   }
   quickSource.value = quickUiState.draft
@@ -96,7 +106,8 @@ function renderHistory(): void {
       quickEnglish.textContent = entry.english
       quickResults.hidden = false
       quickUiState.draft = quickSource.value
-      quickUiState.clearOnNextOpen = false
+      quickUiState.clearAfterClose = false
+      quickUiState.lastTranslatedSource = undefined
       void saveQuickUiState()
     })
     historyList.append(item)
@@ -120,7 +131,11 @@ form.addEventListener("input", updateConnectionStatus)
 
 quickSource.addEventListener("input", () => {
   quickUiState.draft = quickSource.value
-  quickUiState.clearOnNextOpen = false
+  // Any edit after a successful translation means the user is preparing new
+  // text. Preserve that draft on the next popup open, even if they later change
+  // it back to the same visible value.
+  quickUiState.clearAfterClose = false
+  quickUiState.lastTranslatedSource = undefined
   void saveQuickUiState()
 })
 
@@ -168,22 +183,26 @@ form.addEventListener("submit", (event) => {
     })
 })
 
-document.querySelector<HTMLButtonElement>("#retranslate-visible")!.addEventListener("click", (event) => {
+document.querySelector<HTMLButtonElement>("#clear-translation-cache")!.addEventListener("click", (event) => {
   const button = event.currentTarget
   if (!(button instanceof HTMLButtonElement)) return
   button.disabled = true
   saveStatus.className = "save-status"
   saveStatus.textContent = "Clearing cache..."
-  chrome.runtime.sendMessage({ type: "clear-cache-and-retranslate" }, (response?: { ok: boolean }) => {
+  chrome.runtime.sendMessage({ type: "clear-translation-cache" }, (response?: { ok: boolean }) => {
     button.disabled = false
     if (chrome.runtime.lastError || !response?.ok) {
       saveStatus.className = "save-status error"
-      saveStatus.textContent = "Could not clear cache or contact the Slack tab."
+      saveStatus.textContent = "Could not clear the translation cache."
       return
     }
     saveStatus.className = "save-status success"
-    saveStatus.textContent = "Cache cleared. Visible messages are being retranslated."
+    saveStatus.textContent = "Translation cache cleared. Active translations were not stopped."
   })
+})
+
+document.querySelector<HTMLButtonElement>("#stop-translations")!.addEventListener("click", () => {
+  stopSlackTranslations()
 })
 
 document.querySelector<HTMLButtonElement>("#test-provider")!.addEventListener("click", (event) => {
@@ -211,7 +230,7 @@ quickTranslateButton.addEventListener("click", () => {
   quickResults.hidden = true
 
   void sendQuickTranslate(text)
-    .then((response) => {
+    .then(async (response) => {
       if (!response.ok) throw new Error(response.error)
       quickJapanese.textContent = response.japanese
       quickEnglish.textContent = response.english
@@ -227,8 +246,12 @@ quickTranslateButton.addEventListener("click", () => {
         ...quickUiState.history,
       ].slice(0, 50)
       quickUiState.draft = quickSource.value
-      quickUiState.clearOnNextOpen = true
-      void saveQuickUiState()
+      const inputIsUnchanged = quickSource.value.trim() === text
+      quickUiState.lastTranslatedSource = inputIsUnchanged ? quickSource.value : undefined
+      quickUiState.clearAfterClose = inputIsUnchanged
+      // Persist before considering the translation complete. Chrome action
+      // popups can be destroyed immediately when the user clicks elsewhere.
+      await saveQuickUiState()
       renderHistory()
     })
     .catch(() => {
@@ -286,7 +309,8 @@ for (const button of Array.from(document.querySelectorAll<HTMLButtonElement>("[d
 document.querySelector<HTMLButtonElement>("#clear-source")!.addEventListener("click", () => {
   quickSource.value = ""
   quickUiState.draft = ""
-  quickUiState.clearOnNextOpen = false
+  quickUiState.clearAfterClose = false
+  quickUiState.lastTranslatedSource = undefined
   quickResults.hidden = true
   void saveQuickUiState()
   quickSource.focus()
@@ -318,8 +342,17 @@ document.querySelector<HTMLButtonElement>("#retranslate-all")!.addEventListener(
 })
 
 document.querySelector<HTMLButtonElement>("#terminate-all")!.addEventListener("click", () => {
-  chrome.runtime.sendMessage({ type: "terminate-slack-translations" })
+  stopSlackTranslations()
 })
+
+function stopSlackTranslations(): void {
+  chrome.runtime.sendMessage({ type: "terminate-slack-translations" }, (response?: { ok: boolean }) => {
+    saveStatus.className = response?.ok ? "save-status success" : "save-status error"
+    saveStatus.textContent = response?.ok
+      ? "Queued translations stopped. Active translations will finish. Cache kept."
+      : "Could not stop translations on the active Slack tab."
+  })
+}
 
 document.querySelector<HTMLButtonElement>("#close-logs")!.addEventListener("click", () => logsModal.close())
 document.querySelector<HTMLButtonElement>("#refresh-logs")!.addEventListener("click", () => void loadLogs())

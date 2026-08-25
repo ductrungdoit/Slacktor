@@ -18,8 +18,8 @@ export type GetPublicSettingsRequest = {
   type: "get-public-settings"
 }
 
-export type ClearCacheAndRetranslateRequest = {
-  type: "clear-cache-and-retranslate"
+export type ClearTranslationCacheRequest = {
+  type: "clear-translation-cache"
 }
 
 export type ObserveMessageRequest = {
@@ -59,7 +59,7 @@ export type TerminateSlackTranslationsRequest = { type: "terminate-slack-transla
 export type ExtensionRequest =
   | TranslateRequest
   | GetPublicSettingsRequest
-  | ClearCacheAndRetranslateRequest
+  | ClearTranslationCacheRequest
   | ObserveMessageRequest
   | GetThreadContextRequest
   | QuickTranslateRequest

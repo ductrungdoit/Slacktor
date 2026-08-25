@@ -3,7 +3,7 @@ import type { ManifestV3Export } from "@crxjs/vite-plugin"
 const manifest: ManifestV3Export = {
   manifest_version: 3,
   name: "Slacktor",
-  version: "0.1.0",
+  version: "0.1.1",
   description: "AI translation overlay for Slack Web.",
   permissions: ["storage"],
   host_permissions: ["https://app.slack.com/*"],

@@ -3,12 +3,13 @@ import { getProviderSettings } from "../shared/settings"
 import {
   cacheTranslation,
   getCachedTranslation,
-  getTranslationCacheId,
 } from "./translation-cache"
 import { safeEndpoint, writeLog } from "./log-store"
 
 const MAX_ATTEMPTS = 2
 const inFlightTranslations = new Map<string, Promise<string>>()
+const recentTranslations = new Map<string, { translation: string; completedAt: number; timestamp: number }>()
+const RECENT_TRANSLATION_DEDUPE_MS = 8_000
 
 export async function translateMessage(
   message: RawSlackMessage,
@@ -27,18 +28,62 @@ export async function translateMessage(
     if (cached) return cached
   }
 
-  const requestId = getTranslationCacheId(message, settings, context)
+  const inFlightId = getRequestDedupeId(message, settings)
   if (!forceRefresh) {
-    const pending = inFlightTranslations.get(requestId)
+    const recent = recentTranslations.get(inFlightId)
+    const timestamp = Number.parseFloat(message.timestamp ?? "")
+    if (
+      recent &&
+      Date.now() - recent.completedAt <= RECENT_TRANSLATION_DEDUPE_MS &&
+      (!Number.isFinite(timestamp) || !Number.isFinite(recent.timestamp) || Math.abs(timestamp - recent.timestamp) <= 1)
+    ) {
+      return recent.translation
+    }
+    if (recent) recentTranslations.delete(inFlightId)
+    const pending = inFlightTranslations.get(inFlightId)
     if (pending) return pending
   }
 
   const request = requestTranslation(message, context, settings, signal, onRetryStateChange)
-  if (!forceRefresh) inFlightTranslations.set(requestId, request)
+  if (!forceRefresh) inFlightTranslations.set(inFlightId, request)
   try {
-    return await request
+    const translation = await request
+    if (!forceRefresh) {
+      recentTranslations.set(inFlightId, {
+        translation,
+        completedAt: Date.now(),
+        timestamp: Number.parseFloat(message.timestamp ?? ""),
+      })
+      pruneRecentTranslations()
+    }
+    return translation
   } finally {
-    if (!forceRefresh) inFlightTranslations.delete(requestId)
+    if (!forceRefresh && inFlightTranslations.get(inFlightId) === request) {
+      inFlightTranslations.delete(inFlightId)
+    }
+  }
+}
+
+function getRequestDedupeId(
+  message: RawSlackMessage,
+  settings: Awaited<ReturnType<typeof getProviderSettings>>,
+): string {
+  return [
+    message.workspaceId ?? "",
+    message.conversationId ?? "",
+    message.author.status === "resolved" ? message.author.memberId : "unknown",
+    message.sourceText,
+    settings.baseUrl,
+    settings.model,
+    settings.targetLanguage,
+  ].join("\u0000")
+}
+
+function pruneRecentTranslations(): void {
+  if (recentTranslations.size <= 500) return
+  const cutoff = Date.now() - RECENT_TRANSLATION_DEDUPE_MS
+  for (const [key, value] of recentTranslations) {
+    if (value.completedAt < cutoff) recentTranslations.delete(key)
   }
 }
 

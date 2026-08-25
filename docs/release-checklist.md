@@ -9,7 +9,7 @@
 - [ ] Test provider permission, Quick Translator, Slack auto-translation, stop,
       retry, cache clearing, history clearing, and logs clearing.
 - [ ] Capture at least one 1280x800 or 640x400 screenshot.
-- [ ] Upload `release/Slacktor-0.1.0.zip`.
+- [ ] Upload the ZIP matching the current version from `release/`.
 - [ ] Complete listing, privacy practices, distribution, and reviewer test
       instructions using `docs/store-listing.md`.
 - [ ] Start as Unlisted for beta validation, then switch to Public when ready.

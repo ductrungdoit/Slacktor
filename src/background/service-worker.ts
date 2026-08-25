@@ -195,33 +195,15 @@ chrome.runtime.onMessage.addListener((request: ExtensionRequest, _sender, sendRe
   if (request.type === "terminate-slack-translations") {
     void chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
       if (!tab?.id || !tab.url?.startsWith("https://app.slack.com/")) throw new Error("No active Slack tab.")
-      for (const controller of activeTranslationRequests.get(tab.id) ?? []) controller.abort()
-      activeTranslationRequests.delete(tab.id)
-      const previous = slackTranslationStats.get(tab.id)
-      slackTranslationStats.set(tab.id, {
-        waiting: 0,
-        active: 0,
-        concurrency: 10,
-        retrying: 0,
-        completed: previous?.completed ?? 0,
-        total: previous?.total ?? 0,
-      })
-      await updateActionBadge()
       await chrome.tabs.sendMessage(tab.id, { type: "terminate-slack-translations" })
       sendResponse({ ok: true })
     }).catch(() => sendResponse({ ok: false }))
     return true
   }
 
-  if (request.type === "clear-cache-and-retranslate") {
+  if (request.type === "clear-translation-cache") {
     void clearTranslationCache()
-      .then(async () => {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-        if (tab.id && tab.url?.startsWith("https://app.slack.com/")) {
-          await chrome.tabs.sendMessage(tab.id, { type: "retranslate-visible" })
-        }
-        sendResponse({ ok: true })
-      })
+      .then(() => sendResponse({ ok: true }))
       .catch(() => sendResponse({ ok: false }))
     return true
   }

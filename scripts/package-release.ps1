@@ -1,7 +1,8 @@
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $releaseDirectory = Join-Path $root "release"
-$archive = Join-Path $releaseDirectory "Slacktor-0.1.0.zip"
+$package = Get-Content -LiteralPath (Join-Path $root "package.json") -Raw | ConvertFrom-Json
+$archive = Join-Path $releaseDirectory "Slacktor-$($package.version).zip"
 
 New-Item -ItemType Directory -Force -Path $releaseDirectory | Out-Null
 if (Test-Path -LiteralPath $archive) { Remove-Item -LiteralPath $archive -Force }

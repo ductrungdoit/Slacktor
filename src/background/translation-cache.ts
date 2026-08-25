@@ -18,8 +18,16 @@ export async function getCachedTranslation(
   settings: ProviderSettings,
   context: ThreadContextPlan = { recentMessages: [] },
 ): Promise<string | undefined> {
-  const id = getTranslationCacheId(message, settings, context)
-  const entry = await getEntry(id)
+  const id = getTranslationCacheId(message, settings)
+  let entry = await getEntry(id)
+  if (!entry) {
+    entry = await getEntry(getLegacyTranslationCacheId(message, settings, context))
+    if (entry && entry.createdAt + TRANSLATION_CACHE_RETENTION_MS > Date.now()) {
+      const database = await openDatabase()
+      entry = { ...entry, id }
+      await transaction(database, "readwrite", (store) => store.put(entry!))
+    }
+  }
   if (!entry) return undefined
   if (entry.createdAt + TRANSLATION_CACHE_RETENTION_MS > Date.now()) return entry.translation
 
@@ -32,11 +40,11 @@ export async function cacheTranslation(
   message: RawSlackMessage,
   settings: ProviderSettings,
   translation: string,
-  context: ThreadContextPlan = { recentMessages: [] },
+  _context: ThreadContextPlan = { recentMessages: [] },
 ): Promise<void> {
   const database = await openDatabase()
   const entry: TranslationCacheEntry = {
-    id: getTranslationCacheId(message, settings, context),
+    id: getTranslationCacheId(message, settings),
     translation,
     createdAt: Date.now(),
   }
@@ -52,10 +60,32 @@ export async function clearTranslationCache(): Promise<void> {
 export function getTranslationCacheId(
   message: RawSlackMessage,
   settings: ProviderSettings,
+): string {
+  // Thread context is deliberately excluded. Slacktor rebuilds it while Slack
+  // virtualizes the channel, so including it makes the same translation miss
+  // cache after every extension or page reload. Retranslate uses forceRefresh
+  // when the user explicitly wants a context-aware update.
+  return stableHash([
+    message.workspaceId ?? "",
+    message.conversationId ?? "",
+    normalizeSlackMessageId(message.timestamp ?? message.messageId),
+    message.sourceText,
+    settings.baseUrl,
+    settings.model,
+    settings.targetLanguage,
+  ].join("\u0000"))
+}
+
+function normalizeSlackMessageId(value: string): string {
+  const permalinkMatch = value.match(/^p(\d{10})(\d{6})$/)
+  return permalinkMatch ? `${permalinkMatch[1]}.${permalinkMatch[2]}` : value
+}
+
+function getLegacyTranslationCacheId(
+  message: RawSlackMessage,
+  settings: ProviderSettings,
   context: ThreadContextPlan,
 ): string {
-  // Include all current inputs that can change the direct translation result.
-  // The raw API key is deliberately excluded from IndexedDB and the cache ID.
   return stableHash([
     message.workspaceId ?? "",
     message.conversationId ?? "",
