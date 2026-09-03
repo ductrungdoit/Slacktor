@@ -14,25 +14,25 @@ let settings: PublicSettings = {
   targetLanguage: "Vietnamese",
   configured: false,
   autoTranslate: false,
+  showTranslations: true,
   privacyConsent: false,
 }
 let activeTranslations = 0
-const MAX_CONCURRENT_TRANSLATIONS = 10
-const MAX_BACKGROUND_TRANSLATIONS = 6
-let activeBackgroundTranslations = 0
-let completedTranslations = 0
-let totalTranslations = 0
+// Message jobs are drained into the background batch collector. Provider
+// request concurrency and rate limiting belong to the background service.
 type QueuedTranslation = {
   messageId: string
-  targets: Map<TranslationController, () => Promise<string | undefined>>
+  targets: Map<TranslationController, (priority?: boolean) => Promise<string | undefined>>
   started: boolean
   result?: Promise<string | undefined>
   usesBackgroundSlot: boolean
   manualPriority: boolean
   threadPanelPriority: boolean
   recentPriority: boolean
+  automaticPriority: boolean
   timestamp: number
   sequence: number
+  requestGeneration: number
 }
 
 const autoTranslationQueue: QueuedTranslation[] = []
@@ -86,7 +86,7 @@ async function inspect(node: HTMLElement): Promise<void> {
         messageControllers.add(controller)
         controllers.set(messageKey, messageControllers)
         const completedTranslation = completedTranslationsByMessage.get(messageKey)
-        if (completedTranslation) controller.applyTranslation(completedTranslation)
+        if (completedTranslation !== undefined) controller.applyTranslation(completedTranslation)
         else if (stoppedMessageKeys.has(messageKey)) controller.markStopped()
       }
       if (
@@ -112,45 +112,54 @@ function isContextInvalidated(error: unknown): boolean {
 }
 
 function prioritize(job: QueuedTranslation): void {
-  if (job.started) return
+  const generation = ++job.requestGeneration
   job.manualPriority = true
   for (const controller of job.targets.keys()) controller.markPrioritized()
-  sortAutoTranslationQueue()
-  publishQueueStats()
-  scheduleQueueRun()
+  const [primaryController] = job.targets.keys() as MapIterator<TranslationController>
+  if (!primaryController) return
+
+  if (!job.started) {
+    const queueIndex = autoTranslationQueue.indexOf(job)
+    if (queueIndex >= 0) autoTranslationQueue.splice(queueIndex, 1)
+    job.started = true
+    job.usesBackgroundSlot = false
+    activeTranslations += 1
+    publishQueueStats()
+  }
+
+  void primaryController.runUrgent().then((translation) => {
+    if (translation === undefined || generation !== job.requestGeneration) return
+    completedTranslationsByMessage.set(job.messageId, translation)
+    for (const controller of job.targets.keys()) {
+      if (controller !== primaryController) controller.applyTranslation(translation)
+    }
+  }).finally(() => {
+    if (job.result || generation !== job.requestGeneration) return
+    finishTranslationJob(job)
+  })
 }
 
 function runAutoTranslationQueue(): void {
   sortAutoTranslationQueue()
-  while (activeTranslations < MAX_CONCURRENT_TRANSLATIONS && autoTranslationQueue.length > 0) {
-    const jobIndex = autoTranslationQueue.findIndex((candidate) => (
-      isPriorityJob(candidate) || activeBackgroundTranslations < MAX_BACKGROUND_TRANSLATIONS
-    ))
-    if (jobIndex < 0) return
-    const [job] = autoTranslationQueue.splice(jobIndex, 1)
+  markAutomaticPriorityJobs()
+  while (autoTranslationQueue.length > 0) {
+    const [job] = autoTranslationQueue.splice(0, 1)
     if (!job) return
 
     job.started = true
-    job.usesBackgroundSlot = !isPriorityJob(job)
+    job.usesBackgroundSlot = false
     activeTranslations += 1
-    if (job.usesBackgroundSlot) activeBackgroundTranslations += 1
     publishQueueStats()
-    const [primaryController, run] = job.targets.entries().next().value as [TranslationController, () => Promise<string | undefined>]
-    job.result = run()
+    const generation = job.requestGeneration
+    const [primaryController, run] = job.targets.entries().next().value as [TranslationController, (priority?: boolean) => Promise<string | undefined>]
+    job.result = run(job.automaticPriority)
     void job.result.then((translation) => {
-      if (!translation) return
+      if (translation === undefined || generation !== job.requestGeneration) return
       completedTranslationsByMessage.set(job.messageId, translation)
       for (const controller of job.targets.keys()) {
         if (controller !== primaryController) controller.applyTranslation(translation)
       }
-    }).finally(() => {
-      if (queuedTranslations.get(job.messageId) === job) queuedTranslations.delete(job.messageId)
-      activeTranslations = Math.max(0, activeTranslations - 1)
-      if (job.usesBackgroundSlot) activeBackgroundTranslations = Math.max(0, activeBackgroundTranslations - 1)
-      completedTranslations = Math.min(totalTranslations, completedTranslations + 1)
-      publishQueueStats()
-      runAutoTranslationQueue()
-    })
+    }).finally(() => finishTranslationJob(job))
   }
 }
 
@@ -160,6 +169,12 @@ export function startMessageObserver(): MutationObserver {
 
   const observer = new MutationObserver((records) => {
     for (const record of records) {
+      if (record.type === "childList" && record.target instanceof HTMLElement) {
+        const container = isMessageCandidate(record.target)
+          ? record.target
+          : record.target.closest<HTMLElement>("[data-qa='message_container'], [data-message-id], .c-message_kit__message[data-ts]")
+        if (container) void inspect(container)
+      }
       for (const addedNode of Array.from(record.addedNodes)) {
         if (!(addedNode instanceof HTMLElement)) continue
         if (isMessageCandidate(addedNode)) void inspect(addedNode)
@@ -174,6 +189,7 @@ export function startMessageObserver(): MutationObserver {
         if (container) void inspect(container)
       }
     }
+    scheduleReconcile()
   })
 
   observer.observe(document.body, {
@@ -185,15 +201,15 @@ export function startMessageObserver(): MutationObserver {
   window.addEventListener("pagehide", () => {
     observer.disconnect()
     if (queueRunTimer !== undefined) window.clearTimeout(queueRunTimer)
-    activeTranslations = 0
-    activeBackgroundTranslations = 0
+    cancelAllTranslationJobs()
     autoTranslationQueue.length = 0
     queuedTranslations.clear()
     publishQueueStats()
   }, { once: true })
 
-  chrome.runtime.onMessage.addListener((request: ContentRequest) => {
+  chrome.runtime.onMessage.addListener((request: ContentRequest, _sender, sendResponse) => {
     if (request.type === "retranslate-visible") {
+      let queued = 0
       for (const node of findMessageNodes()) {
         const message = extractMessage(node)
         if (!message || !node.getBoundingClientRect().height) continue
@@ -202,11 +218,18 @@ export function startMessageObserver(): MutationObserver {
         const messageControllers = controllers.get(messageKey)
         if (!messageControllers) continue
         for (const controller of messageControllers) {
+          if (!controller.isConnected()) {
+            messageControllers.delete(controller)
+            continue
+          }
           enqueueTranslation(messageKey, controller, controller.retranslate, message, isInThreadPanel(node))
+          queued += 1
         }
+        if (messageControllers.size === 0) controllers.delete(messageKey)
       }
       publishQueueStats()
       runAutoTranslationQueue()
+      sendResponse({ ok: queued > 0, queued })
       return
     }
 
@@ -218,8 +241,12 @@ export function startMessageObserver(): MutationObserver {
         for (const controller of job.targets.keys()) controller.markStopped()
       }
       autoTranslationQueue.length = 0
-      totalTranslations = Math.max(completedTranslations + activeTranslations, totalTranslations - stoppedCount)
       publishQueueStats()
+    }
+
+    if (request.type === "set-translation-visibility") {
+      settings.showTranslations = request.visible
+      applyTranslationVisibility(request.visible)
     }
   })
 
@@ -275,7 +302,7 @@ function normalizeSlackMessageId(value: string): string {
 function enqueueTranslation(
   messageId: string,
   controller: TranslationController,
-  run: () => Promise<string | undefined>,
+  run: (priority?: boolean) => Promise<string | undefined>,
   message: RawSlackMessage,
   threadPanelPriority: boolean,
 ): void {
@@ -288,7 +315,7 @@ function enqueueTranslation(
     existing.timestamp = Math.max(existing.timestamp, getMessageTimestamp(message))
     if (existing.started) {
       void existing.result?.then((translation) => {
-        if (translation) controller.applyTranslation(translation)
+        if (translation !== undefined) controller.applyTranslation(translation)
       })
     }
     else controller.markQueued(() => prioritize(existing))
@@ -296,11 +323,6 @@ function enqueueTranslation(
     return
   }
 
-  if (activeTranslations === 0 && autoTranslationQueue.length === 0) {
-    completedTranslations = 0
-    totalTranslations = 0
-  }
-  totalTranslations += 1
   const job: QueuedTranslation = {
     messageId,
     targets: new Map([[controller, run]]),
@@ -309,13 +331,23 @@ function enqueueTranslation(
     manualPriority: false,
     threadPanelPriority,
     recentPriority: isRecentMessage(message),
+    automaticPriority: false,
     timestamp: getMessageTimestamp(message),
     sequence: queueSequence++,
+    requestGeneration: 0,
   }
   queuedTranslations.set(messageId, job)
   autoTranslationQueue.push(job)
   sortAutoTranslationQueue()
   controller.markQueued(() => prioritize(job))
+  publishQueueStats()
+  scheduleQueueRun()
+}
+
+function finishTranslationJob(job: QueuedTranslation): void {
+  if (queuedTranslations.get(job.messageId) !== job) return
+  queuedTranslations.delete(job.messageId)
+  activeTranslations = Math.max(0, activeTranslations - 1)
   publishQueueStats()
   runAutoTranslationQueue()
 }
@@ -332,10 +364,6 @@ function getMessageTimestamp(message: RawSlackMessage): number {
 function isRecentMessage(message: RawSlackMessage): boolean {
   const timestamp = getMessageTimestamp(message)
   return timestamp > 0 && Math.abs(Date.now() / 1000 - timestamp) <= NEW_MESSAGE_WINDOW_SECONDS
-}
-
-function isPriorityJob(job: QueuedTranslation): boolean {
-  return job.manualPriority || job.threadPanelPriority || job.recentPriority
 }
 
 function sortAutoTranslationQueue(): void {
@@ -359,14 +387,53 @@ function scheduleQueueRun(): void {
   }, 80)
 }
 
+function markAutomaticPriorityJobs(): void {
+  for (const job of autoTranslationQueue) job.automaticPriority = false
+  const newest = [...autoTranslationQueue]
+    .sort((left, right) => right.timestamp - left.timestamp)
+    .slice(0, 3)
+  for (const job of newest) job.automaticPriority = true
+}
+
+let reconcileTimer: number | undefined
+
+function scheduleReconcile(): void {
+  if (reconcileTimer !== undefined) window.clearTimeout(reconcileTimer)
+  reconcileTimer = window.setTimeout(() => {
+    reconcileTimer = undefined
+    reconcileDisconnectedJobs()
+  }, 100)
+}
+
+function reconcileDisconnectedJobs(): void {
+  for (const job of [...queuedTranslations.values()]) {
+    for (const controller of job.targets.keys()) {
+      if (!controller.isConnected()) {
+        controller.cancel()
+        job.targets.delete(controller)
+      }
+    }
+    if (job.targets.size > 0) continue
+    const queueIndex = autoTranslationQueue.indexOf(job)
+    if (queueIndex >= 0) autoTranslationQueue.splice(queueIndex, 1)
+    queuedTranslations.delete(job.messageId)
+    if (job.started) activeTranslations = Math.max(0, activeTranslations - 1)
+  }
+  publishQueueStats()
+}
+
+function cancelAllTranslationJobs(): void {
+  for (const job of queuedTranslations.values()) {
+    for (const controller of job.targets.keys()) controller.cancel()
+  }
+  activeTranslations = 0
+}
+
 function publishQueueStats(): void {
   void sendMessageSafely({
     type: "update-slack-translation-stats",
     waiting: autoTranslationQueue.length,
     active: activeTranslations,
-    concurrency: MAX_CONCURRENT_TRANSLATIONS,
-    completed: completedTranslations,
-    total: totalTranslations,
   })
 }
 
@@ -374,10 +441,22 @@ async function loadSettingsAndInspect(): Promise<void> {
   try {
     const response = await sendMessageSafely<PublicSettings>({ type: "get-public-settings" })
     if (response) settings = response
+    applyTranslationVisibility(settings.showTranslations)
     if (!settings.privacyConsent) return
     for (const node of findMessageNodes()) void inspect(node)
   } catch (error) {
     if (!isContextInvalidated(error)) throw error
+  }
+}
+
+function applyTranslationVisibility(visible: boolean): void {
+  document.documentElement.classList.toggle("slacktor-hide-translations", !visible)
+  let style = document.querySelector<HTMLStyleElement>("#slacktor-visibility-style")
+  if (!style) {
+    style = document.createElement("style")
+    style.id = "slacktor-visibility-style"
+    style.textContent = ".slacktor-hide-translations [data-slacktor-translation] { display: none !important; }"
+    document.documentElement.append(style)
   }
 }
 

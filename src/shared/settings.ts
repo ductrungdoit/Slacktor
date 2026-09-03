@@ -3,7 +3,9 @@ export type ProviderSettings = {
   apiKey: string
   model: string
   targetLanguage: string
+  customPrompt: string
   autoTranslate: boolean
+  showTranslations: boolean
   privacyConsent: boolean
 }
 
@@ -14,7 +16,9 @@ export const DEFAULT_PROVIDER_SETTINGS: ProviderSettings = {
   apiKey: "",
   model: "",
   targetLanguage: "Vietnamese",
+  customPrompt: "",
   autoTranslate: false,
+  showTranslations: true,
   privacyConsent: false,
 }
 

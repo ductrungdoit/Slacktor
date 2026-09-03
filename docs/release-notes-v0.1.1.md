@@ -38,7 +38,10 @@ workspace first and report unexpected behavior through GitHub Issues.
 
 ## Install For Testing
 
-1. Download `Slacktor-0.1.1.zip` from the Assets section below.
+1. Download the attached `Slacktor-0.1.1.zip` file from the Assets section
+   below. Do not download GitHub's automatically generated **Source code
+   (zip)** or **Source code (tar.gz)** archives; those are not installable
+   extension builds.
 2. Extract the ZIP to a permanent local directory.
 3. Open `chrome://extensions` in Chrome or another Chromium-based browser.
 4. Enable **Developer mode**.
@@ -47,8 +50,9 @@ workspace first and report unexpected behavior through GitHub Issues.
 7. Pin Slacktor from the browser extensions menu.
 8. Open or refresh `https://app.slack.com/`.
 
-Do not load the ZIP directly. Chrome requires the extracted directory for an
-unpacked extension.
+After extraction, `manifest.json` must appear directly inside the selected
+directory. Do not load the ZIP directly; Chrome requires the extracted
+directory for an unpacked extension.
 
 ## Configure A Provider
 
@@ -133,8 +137,10 @@ Useful details include:
 Mình vừa đóng gói bản thử nghiệm Slacktor `v0.1.1`, một extension dịch tin nhắn
 trực tiếp trên Slack Web bằng AI provider do người dùng tự cấu hình.
 
-Anh em có thể tải file `Slacktor-0.1.1.zip` trong phần Assets của GitHub Release,
-giải nén, mở `chrome://extensions`, bật Developer mode rồi chọn **Load unpacked**.
+Anh em tải đúng file đính kèm `Slacktor-0.1.1.zip` trong phần Assets của GitHub
+Release, không tải hai file **Source code** do GitHub tự tạo. Sau khi giải nén,
+mở `chrome://extensions`, bật Developer mode rồi chọn **Load unpacked** và chọn
+thư mục có `manifest.json` nằm trực tiếp bên trong.
 
 Nhờ anh em thử giúp các tình huống sau:
 

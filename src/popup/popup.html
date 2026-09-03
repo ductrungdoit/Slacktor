@@ -12,7 +12,7 @@
       <header>
         <div class="brand-mark"><img src="/icons/icon-32.png" alt="Slacktor" /></div>
         <div class="brand-copy">
-          <h1>Slacktor <span class="app-version">v0.1.1</span></h1>
+          <h1>Slacktor <span class="app-version">v0.1.4</span></h1>
           <span id="connection-status" class="status-dot unconfigured" role="status" tabindex="0" title="Checking provider status" aria-label="Checking provider status"></span>
         </div>
         <button id="show-logs" class="icon-button" type="button" title="Logs" aria-label="Logs">
@@ -22,6 +22,10 @@
       </header>
 
       <section id="main-view" class="view">
+        <label class="toggle-row main-visibility-toggle">
+          <input id="show-translations" type="checkbox" />
+          <span><strong>Show translations in Slack</strong><small>Turn off to copy only original messages.</small></span>
+        </label>
         <section class="quick-translator">
         <div class="section-heading">
           <div>
@@ -39,11 +43,11 @@
         </div>
         <div id="quick-results" class="quick-results" hidden>
           <article>
-            <button class="copy-icon" data-copy="japanese" type="button" title="Copy" aria-label="Copy Japanese"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2h9a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3h-1v-2h1a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1H5V5a3 3 0 0 1 3-3Z"/><path d="M4 6h9a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H4a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3Zm0 2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H4Z"/></svg></button>
+            <div class="quick-result-actions"><button class="copy-icon" data-copy="japanese" type="button" title="Copy" aria-label="Copy Japanese"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2h9a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3h-1v-2h1a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1H5V5a3 3 0 0 1 3-3Z"/><path d="M4 6h9a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H4a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3Zm0 2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H4Z"/></svg></button></div>
             <pre id="quick-japanese"></pre>
           </article>
           <article>
-            <button class="copy-icon" data-copy="english" type="button" title="Copy" aria-label="Copy English"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2h9a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3h-1v-2h1a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1H5V5a3 3 0 0 1 3-3Z"/><path d="M4 6h9a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H4a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3Zm0 2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H4Z"/></svg></button>
+            <div class="quick-result-actions"><button class="copy-icon" data-copy="english" type="button" title="Copy" aria-label="Copy English"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2h9a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3h-1v-2h1a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1H5V5a3 3 0 0 1 3-3Z"/><path d="M4 6h9a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H4a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3Zm0 2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H4Z"/></svg></button></div>
             <pre id="quick-english"></pre>
           </article>
         </div>
@@ -62,6 +66,7 @@
       <section id="settings-view" class="view" hidden>
         <div class="settings-heading"><button id="back-main" type="button">&#8592;</button><div><h2>Settings</h2><p>Provider and Slack translation preferences.</p></div></div>
         <form id="quick-settings">
+        <div class="settings-fields">
         <label>
           AI endpoint
           <input id="base-url" type="url" placeholder="https://api.example.com/v1" required />
@@ -81,17 +86,26 @@
           Translate to
           <input id="target-language" type="text" value="Vietnamese" required />
         </label>
+        <label>
+          Custom translation instructions
+          <textarea id="custom-prompt" rows="3" maxlength="2000" placeholder="Example: Keep product names in English and use our team's terminology."></textarea>
+          <small class="field-help">Optional. Applied in addition to Slacktor's required translation and output rules.</small>
+        </label>
         <label class="toggle-row">
           <input id="auto-translate" type="checkbox" />
           <span><strong>Auto-translate messages</strong><small>System, bot, and deleted messages stay excluded.</small></span>
         </label>
+        </div>
 
-        <p id="save-status" class="save-status" role="status"></p>
-        <button id="test-provider" class="secondary" type="button">Test provider</button>
-        <button class="save" type="submit">Save configuration</button>
-        <div class="translation-maintenance-actions">
-          <button id="stop-translations" class="danger" type="button">Stop translations</button>
-          <button id="clear-translation-cache" class="secondary" type="button">Clear translation cache</button>
+        <div class="settings-actions">
+          <p id="save-status" class="save-status" role="status"></p>
+          <div class="settings-primary-actions">
+            <button id="test-provider" class="secondary" type="button">Test provider</button>
+            <button class="save" type="submit">Save configuration</button>
+          </div>
+          <div class="translation-maintenance-actions">
+            <button id="clear-translation-cache" class="danger" type="button">Clear translation cache</button>
+          </div>
         </div>
         </form>
       </section>
@@ -99,11 +113,11 @@
       <footer>
         <div class="footer-progress">
           <div class="stats-row">
-            <span id="slack-queue-stats" class="api-stats">0 waiting · 0/10 active</span>
-            <span id="slack-progress-stats" class="progress-stats">0/0 translated - 0%</span>
+            <span id="slack-queue-stats" class="api-stats">0 waiting · 0 active</span>
+            <span id="slack-progress-stats" class="progress-stats">0 translated today · 0 LLM requests</span>
           </div>
           <div class="footer-controls">
-            <button id="retranslate-all" class="footer-icon-button" type="button" title="Retranslate visible Slack messages" aria-label="Retranslate visible Slack messages"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-4H3a1 1 0 1 0 0 2h5a1 1 0 0 0 1-1V3a1 1 0 1 0-2 0v2.1A10 10 0 1 1 2 14a1 1 0 1 1 2 0 8 8 0 1 0 16-3Z"/></svg></button>
+            <button id="retranslate-all" class="footer-icon-button" type="button" title="Retranslate visible Slack messages" aria-label="Retranslate visible Slack messages">&#8635;</button>
             <button id="terminate-all" class="footer-icon-button" type="button" title="Stop Slack translations" aria-label="Stop Slack translations"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4Zm0 2a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H7Z"/><path d="M8 8h8v8H8z"/></svg></button>
           </div>
         </div>

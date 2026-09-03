@@ -1,5 +1,6 @@
 import { getProviderSettings, type ProviderSettings } from "../shared/settings"
 import { safeEndpoint, writeLog } from "./log-store"
+import { providerFetch } from "./provider-fetch"
 
 export async function quickTranslate(text: string): Promise<{ japanese: string; english: string }> {
   const settings = await getProviderSettings()
@@ -28,7 +29,7 @@ async function translate(
   const endpoint = baseUrl.endsWith("/chat/completions") ? baseUrl : `${baseUrl}/chat/completions`
   let response: Response
   try {
-    response = await fetch(endpoint, {
+    response = await providerFetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -39,7 +40,7 @@ async function translate(
         messages: [
           {
             role: "system",
-            content: "Translate the provided text accurately. Preserve names, URLs, code, formatting, and tone. Return only the translation.",
+            content: "Translate the provided text accurately. Preserve its original vibe, intent, emotional tone, names, URLs, code, and formatting. Make the wording naturally polite in the target language without changing the meaning or intensity. Return only the translation.",
           },
           {
             role: "user",

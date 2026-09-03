@@ -9,7 +9,9 @@ const baseUrl = document.querySelector<HTMLInputElement>("#base-url")!
 const model = document.querySelector<HTMLInputElement>("#model")!
 const apiKey = document.querySelector<HTMLInputElement>("#api-key")!
 const targetLanguage = document.querySelector<HTMLInputElement>("#target-language")!
+const customPrompt = document.querySelector<HTMLTextAreaElement>("#custom-prompt")!
 const autoTranslate = document.querySelector<HTMLInputElement>("#auto-translate")!
+const showTranslations = document.querySelector<HTMLInputElement>("#show-translations")!
 const toggleKey = document.querySelector<HTMLButtonElement>("#toggle-key")!
 const quickSource = document.querySelector<HTMLTextAreaElement>("#quick-source")!
 const quickTranslateButton = document.querySelector<HTMLButtonElement>("#quick-translate")!
@@ -46,6 +48,7 @@ type QuickUiState = {
   history: QuickHistoryEntry[]
 }
 const QUICK_UI_KEY = "quick-translator-ui"
+const QUICK_HISTORY_RETENTION_MS = 2 * 24 * 60 * 60 * 1000
 let quickUiState: QuickUiState = { draft: "", clearAfterClose: false, history: [] }
 
 void Promise.all([load(), loadQuickUiState()])
@@ -62,7 +65,9 @@ async function load(): Promise<void> {
   model.value = settings.model
   apiKey.value = settings.apiKey
   targetLanguage.value = settings.targetLanguage
+  customPrompt.value = settings.customPrompt
   autoTranslate.checked = settings.autoTranslate
+  showTranslations.checked = settings.showTranslations
   privacyConsent = settings.privacyConsent
   updateConnectionStatus()
   if (!privacyConsent) privacyConsentModal.showModal()
@@ -71,6 +76,9 @@ async function load(): Promise<void> {
 async function loadQuickUiState(): Promise<void> {
   const stored = await chrome.storage.local.get(QUICK_UI_KEY)
   quickUiState = { ...quickUiState, ...stored[QUICK_UI_KEY] }
+  const retainedHistory = retainRecentHistory(quickUiState.history)
+  const historyWasPruned = retainedHistory.length !== quickUiState.history.length
+  quickUiState.history = retainedHistory
   if (
     quickUiState.clearAfterClose &&
     quickUiState.lastTranslatedSource !== undefined &&
@@ -79,6 +87,8 @@ async function loadQuickUiState(): Promise<void> {
     quickUiState.draft = ""
     quickUiState.clearAfterClose = false
     quickUiState.lastTranslatedSource = undefined
+    await saveQuickUiState()
+  } else if (historyWasPruned) {
     await saveQuickUiState()
   }
   quickSource.value = quickUiState.draft
@@ -184,10 +194,6 @@ document.querySelector<HTMLButtonElement>("#clear-translation-cache")!.addEventL
   })
 })
 
-document.querySelector<HTMLButtonElement>("#stop-translations")!.addEventListener("click", () => {
-  stopSlackTranslations()
-})
-
 document.querySelector<HTMLButtonElement>("#test-provider")!.addEventListener("click", (event) => {
   const button = event.currentTarget
   if (!(button instanceof HTMLButtonElement)) return
@@ -231,7 +237,9 @@ function getDraftProviderSettings(): ProviderSettings {
     apiKey: apiKey.value.trim(),
     model: model.value.trim(),
     targetLanguage: targetLanguage.value.trim(),
+    customPrompt: customPrompt.value.trim(),
     autoTranslate: autoTranslate.checked,
+    showTranslations: showTranslations.checked,
     privacyConsent,
   }
   if (!settings.baseUrl || !settings.apiKey || !settings.model || !settings.targetLanguage) {
@@ -239,6 +247,16 @@ function getDraftProviderSettings(): ProviderSettings {
   }
   return settings
 }
+
+showTranslations.addEventListener("change", () => {
+  void getProviderSettings().then((settings) => saveProviderSettings({
+    ...settings,
+    showTranslations: showTranslations.checked,
+  })).then(() => chrome.runtime.sendMessage({
+    type: "set-translation-visibility",
+    visible: showTranslations.checked,
+  }))
+})
 
 async function requestProviderPermission(endpoint: string): Promise<void> {
   let url: URL
@@ -281,7 +299,7 @@ quickTranslateButton.addEventListener("click", () => {
           english: response.english,
           createdAt: Date.now(),
         },
-        ...quickUiState.history,
+        ...retainRecentHistory(quickUiState.history),
       ].slice(0, 50)
       quickUiState.draft = quickSource.value
       const inputIsUnchanged = quickSource.value.trim() === text
@@ -316,6 +334,12 @@ function sendQuickTranslate(text: string): Promise<QuickTranslateResponse> {
       reject(error)
     }
   })
+}
+
+function retainRecentHistory(history: QuickHistoryEntry[] | undefined): QuickHistoryEntry[] {
+  if (!Array.isArray(history)) return []
+  const cutoff = Date.now() - QUICK_HISTORY_RETENTION_MS
+  return history.filter((entry) => Number.isFinite(entry?.createdAt) && entry.createdAt >= cutoff)
 }
 
 function setQuickTranslating(translating: boolean): void {
@@ -376,7 +400,15 @@ showLogsButton.addEventListener("click", () => {
 })
 
 document.querySelector<HTMLButtonElement>("#retranslate-all")!.addEventListener("click", () => {
-  chrome.runtime.sendMessage({ type: "retranslate-visible-from-popup" })
+  chrome.runtime.sendMessage(
+    { type: "retranslate-visible-from-popup" },
+    (response?: { ok: boolean; queued?: number }) => {
+      saveStatus.className = response?.ok ? "save-status success" : "save-status error"
+      saveStatus.textContent = response?.ok
+        ? `${response.queued ?? 0} visible messages queued for retranslation.`
+        : "No visible Slack messages could be retranslated."
+    },
+  )
 })
 
 document.querySelector<HTMLButtonElement>("#terminate-all")!.addEventListener("click", () => {
@@ -431,15 +463,13 @@ async function refreshSlackApiStats(): Promise<void> {
     }) as {
       waiting: number
       active: number
-      concurrency: number
       retrying: number
-      completed: number
-      total: number
+      translatedToday: number
+      requestsToday: number
     }
     const retrying = stats.retrying > 0 ? ` · ${stats.retrying} retrying` : ""
-    const progress = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0
-    slackQueueStats.textContent = `${stats.waiting} waiting · ${stats.active}/${stats.concurrency} active${retrying}`
-    slackProgressStats.textContent = `${stats.completed}/${stats.total} translated - ${progress}%`
+    slackQueueStats.textContent = `${stats.waiting} waiting · ${stats.active} active${retrying}`
+    slackProgressStats.textContent = `${stats.translatedToday} translated today · ${stats.requestsToday} LLM requests`
     slackQueueStats.className = `api-stats ${stats.waiting > 0 ? "busy" : stats.active > 0 ? "active" : ""}`
   } catch {
     slackQueueStats.textContent = "Stats unavailable"

@@ -12,6 +12,7 @@ const DATABASE_NAME = "slacktor"
 const STORE_NAME = "translations"
 const DATABASE_VERSION = 5
 const TRANSLATION_CACHE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000
+const TRANSLATION_FORMAT_VERSION = "line-breaks-v2"
 
 export async function getCachedTranslation(
   message: RawSlackMessage,
@@ -66,6 +67,7 @@ export function getTranslationCacheId(
   // cache after every extension or page reload. Retranslate uses forceRefresh
   // when the user explicitly wants a context-aware update.
   return stableHash([
+    TRANSLATION_FORMAT_VERSION,
     message.workspaceId ?? "",
     message.conversationId ?? "",
     normalizeSlackMessageId(message.timestamp ?? message.messageId),
@@ -73,6 +75,7 @@ export function getTranslationCacheId(
     settings.baseUrl,
     settings.model,
     settings.targetLanguage,
+    settings.customPrompt,
   ].join("\u0000"))
 }
 
@@ -87,6 +90,7 @@ function getLegacyTranslationCacheId(
   context: ThreadContextPlan,
 ): string {
   return stableHash([
+    TRANSLATION_FORMAT_VERSION,
     message.workspaceId ?? "",
     message.conversationId ?? "",
     message.messageId,
@@ -94,6 +98,7 @@ function getLegacyTranslationCacheId(
     settings.baseUrl,
     settings.model,
     settings.targetLanguage,
+    settings.customPrompt,
     context.summary ?? "",
     context.recentMessages.map((item) => `${item.messageId}\u0001${item.timestamp}\u0001${item.sourceText}`).join("\u0002"),
   ].join("\u0000"))

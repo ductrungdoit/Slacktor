@@ -1,6 +1,7 @@
 import type { ThreadContextMessage } from "../shared/types"
 import { getProviderSettings } from "../shared/settings"
 import { safeEndpoint, writeLog } from "./log-store"
+import { providerFetch } from "./provider-fetch"
 
 export async function summarizeThread(messages: ThreadContextMessage[]): Promise<string> {
   const settings = await getProviderSettings()
@@ -16,7 +17,7 @@ export async function summarizeThread(messages: ThreadContextMessage[]): Promise
     .join("\n")
   let response: Response
   try {
-    response = await fetch(endpoint, {
+    response = await providerFetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${settings.apiKey}` },
       body: JSON.stringify({

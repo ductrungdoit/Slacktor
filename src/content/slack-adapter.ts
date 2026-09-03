@@ -65,7 +65,7 @@ export function extractMessage(node: HTMLElement): RawSlackMessage | undefined {
   const textNode = getTextNode(node)
   if (!textNode) return undefined
 
-  const sourceText = textNode.innerText.trim()
+  const sourceText = getSourceText(textNode)
   if (!sourceText) return undefined
 
   const author = extractAuthor(node)
@@ -85,6 +85,53 @@ export function extractMessage(node: HTMLElement): RawSlackMessage | undefined {
     isSystemMessage: false,
     isDirectMessage: false,
   }
+}
+
+function getSourceText(textNode: HTMLElement): string {
+  const clone = textNode.cloneNode(true) as HTMLElement
+  for (const injected of Array.from(clone.querySelectorAll("[data-slacktor-translation], [data-slacktor-translate-action]"))) {
+    injected.remove()
+  }
+  return extractStructuredText(clone)
+}
+
+const LINE_BREAK_ELEMENTS = new Set([
+  "BLOCKQUOTE", "LI", "OL", "P", "PRE", "UL",
+])
+
+function extractStructuredText(root: HTMLElement): string {
+  let text = ""
+  const appendBreak = () => {
+    if (text && !text.endsWith("\n")) text += "\n"
+  }
+  const visit = (node: Node) => {
+    if (node instanceof Text) {
+      text += node.data
+      return
+    }
+    if (!(node instanceof HTMLElement)) return
+    if (node.tagName === "BR") {
+      text += "\n"
+      return
+    }
+    const isBlock = LINE_BREAK_ELEMENTS.has(node.tagName) || (
+      node !== root && (
+        node.classList.contains("p-rich_text_section") ||
+        node.classList.contains("p-rich_text_list") ||
+        node.classList.contains("p-rich_text_quote") ||
+        node.classList.contains("p-rich_text_preformatted")
+      )
+    )
+    if (isBlock) appendBreak()
+    for (const child of Array.from(node.childNodes)) visit(child)
+    if (isBlock) appendBreak()
+  }
+  visit(root)
+  return text
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
 }
 
 export function getTranslationAnchor(node: HTMLElement): HTMLElement | undefined {

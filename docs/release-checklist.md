@@ -10,6 +10,11 @@
       retry, cache clearing, history clearing, and logs clearing.
 - [ ] Capture at least one 1280x800 or 640x400 screenshot.
 - [ ] Upload the ZIP matching the current version from `release/`.
+- [ ] Open the published GitHub Release and confirm its Assets section contains
+      `Slacktor-<version>.zip`; GitHub's generated Source code archives are not
+      extension packages.
+- [ ] Download the published asset, extract it, and confirm `manifest.json` is
+      at the extracted directory root before sharing installation instructions.
 - [ ] Complete listing, privacy practices, distribution, and reviewer test
       instructions using `docs/store-listing.md`.
 - [ ] Start as Unlisted for beta validation, then switch to Public when ready.

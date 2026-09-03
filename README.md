@@ -44,11 +44,15 @@ provider origin.
 
 ## Install From A Release
 
-1. Download the versioned Slacktor ZIP from the repository release assets.
+1. Download the versioned `Slacktor-<version>.zip` file from the release's
+   **Assets** section. Do not download GitHub's automatically generated
+   **Source code (zip)** or **Source code (tar.gz)** archives; they contain the
+   project source, not the built extension.
 2. Extract the ZIP to a permanent local directory.
 3. Open `chrome://extensions`.
 4. Enable **Developer mode**.
-5. Click **Load unpacked** and select the extracted directory.
+5. Click **Load unpacked** and select the extracted directory that contains
+   `manifest.json` directly.
 6. Pin Slacktor from the browser extensions menu.
 
 When installing an update manually, keep the same extension entry and use its
@@ -71,7 +75,9 @@ Slack tab so Chrome injects the new content script.
 1. Click the pinned Slacktor icon.
 2. Review and accept the Slack data disclosure.
 3. Open Settings and enter the provider endpoint, model, API key, and target
-   language.
+   language. Optionally add custom translation instructions for terminology or
+   style preferences; Slacktor still enforces its required translation and
+   structured-output rules.
 4. Enable **Auto-translate messages** if desired.
 5. Click **Save configuration**.
 6. Approve Chrome access to the exact provider origin when prompted.

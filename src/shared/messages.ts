@@ -5,6 +5,7 @@ export type PublicSettings = {
   targetLanguage: string
   configured: boolean
   autoTranslate: boolean
+  showTranslations: boolean
   privacyConsent: boolean
 }
 
@@ -13,7 +14,11 @@ export type TranslateRequest = {
   message: RawSlackMessage
   context?: ThreadContextPlan
   forceRefresh?: boolean
+  urgent?: boolean
+  priority?: boolean
+  requestId?: string
 }
+export type CancelTranslationRequest = { type: "cancel-translation"; requestId: string }
 
 export type GetPublicSettingsRequest = {
   type: "get-public-settings"
@@ -44,9 +49,6 @@ export type UpdateSlackTranslationStatsRequest = {
   type: "update-slack-translation-stats"
   waiting: number
   active: number
-  concurrency: number
-  completed: number
-  total: number
 }
 export type GetSlackTranslationStatsRequest = {
   type: "get-slack-translation-stats"
@@ -59,9 +61,11 @@ export type TestProviderRequest = {
 }
 export type RetranslateVisibleRequest = { type: "retranslate-visible-from-popup" }
 export type TerminateSlackTranslationsRequest = { type: "terminate-slack-translations" }
+export type SetTranslationVisibilityRequest = { type: "set-translation-visibility"; visible: boolean }
 
 export type ExtensionRequest =
   | TranslateRequest
+  | CancelTranslationRequest
   | GetPublicSettingsRequest
   | ClearTranslationCacheRequest
   | ObserveMessageRequest
@@ -75,10 +79,12 @@ export type ExtensionRequest =
   | TestProviderRequest
   | RetranslateVisibleRequest
   | TerminateSlackTranslationsRequest
+  | SetTranslationVisibilityRequest
 
 export type ContentRequest =
   | { type: "retranslate-visible" }
   | { type: "terminate-slack-translations" }
+  | { type: "set-translation-visibility"; visible: boolean }
 
 export type TranslateResponse =
   | { ok: true; translation: string }

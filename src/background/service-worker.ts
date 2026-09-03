@@ -7,17 +7,16 @@ import { summarizeThread } from "./summary-service"
 import { quickTranslate, testProvider } from "./quick-translation-service"
 import type { QuickTranslateResponse } from "../shared/messages"
 import { clearLogs, getLogs } from "./log-store"
+import { getDailyUsageStats } from "./usage-stats"
 
 type SlackTranslationStats = {
   waiting: number
   active: number
-  concurrency: number
   retrying: number
-  completed: number
-  total: number
 }
 const slackTranslationStats = new Map<number, SlackTranslationStats>()
 const activeTranslationRequests = new Map<number, Set<AbortController>>()
+const translationRequestsById = new Map<string, AbortController>()
 type ProviderRuntimeStatus = {
   state: "unconfigured" | "ready" | "error"
   message: string
@@ -36,6 +35,7 @@ chrome.runtime.onMessage.addListener((request: ExtensionRequest, _sender, sendRe
         targetLanguage: settings.targetLanguage,
         configured: Boolean(settings.baseUrl && settings.apiKey && settings.model),
         autoTranslate: settings.autoTranslate,
+        showTranslations: settings.showTranslations,
         privacyConsent: settings.privacyConsent,
       }
       if (!response.configured) {
@@ -66,14 +66,13 @@ chrome.runtime.onMessage.addListener((request: ExtensionRequest, _sender, sendRe
         const stats = slackTranslationStats.get(tabId) ?? {
           waiting: 0,
           active: 0,
-          concurrency: 10,
           retrying: 0,
-          completed: 0,
-          total: 0,
         }
         stats.retrying = Math.max(0, stats.retrying + (retrying ? 1 : -1))
         slackTranslationStats.set(tabId, stats)
       },
+      request.urgent,
+      request.priority,
     )
       .then((translation) => {
         providerRuntimeStatus = { state: "ready", message: "Provider configured and responding" }
@@ -89,8 +88,17 @@ chrome.runtime.onMessage.addListener((request: ExtensionRequest, _sender, sendRe
       .finally(() => {
         if (tabId === undefined) return
         activeTranslationRequests.get(tabId)?.delete(controller)
+        if (request.requestId) translationRequestsById.delete(request.requestId)
       })
+    if (request.requestId) translationRequestsById.set(request.requestId, controller)
     return true
+  }
+
+  if (request.type === "cancel-translation") {
+    translationRequestsById.get(request.requestId)?.abort(new DOMException("Translation no longer visible.", "AbortError"))
+    translationRequestsById.delete(request.requestId)
+    sendResponse({ ok: true })
+    return false
   }
 
   if (request.type === "observe-message") {
@@ -134,10 +142,7 @@ chrome.runtime.onMessage.addListener((request: ExtensionRequest, _sender, sendRe
       slackTranslationStats.set(_sender.tab.id, {
         waiting: request.waiting,
         active: request.active,
-        concurrency: request.concurrency,
         retrying: slackTranslationStats.get(_sender.tab.id)?.retrying ?? 0,
-        completed: request.completed,
-        total: request.total,
       })
       void updateActionBadge()
     }
@@ -149,15 +154,14 @@ chrome.runtime.onMessage.addListener((request: ExtensionRequest, _sender, sendRe
     const stats = request.tabId === undefined
       ? undefined
       : slackTranslationStats.get(request.tabId)
-    sendResponse(stats ?? {
-      waiting: 0,
-      active: 0,
-      concurrency: 10,
-      retrying: 0,
-      completed: 0,
-      total: 0,
-    })
-    return false
+    void getDailyUsageStats().then((usage) => sendResponse({
+      waiting: stats?.waiting ?? 0,
+      active: stats?.active ?? 0,
+      retrying: stats?.retrying ?? 0,
+      translatedToday: usage.translatedMessages,
+      requestsToday: usage.llmRequests,
+    }))
+    return true
   }
 
   if (request.type === "get-provider-runtime-status") {
@@ -186,8 +190,8 @@ chrome.runtime.onMessage.addListener((request: ExtensionRequest, _sender, sendRe
   }
 
   if (request.type === "retranslate-visible-from-popup") {
-    void sendToActiveSlackTab({ type: "retranslate-visible" })
-      .then(() => sendResponse({ ok: true }))
+    void sendToActiveSlackTab<{ ok: boolean; queued: number }>({ type: "retranslate-visible" })
+      .then((response) => sendResponse(response))
       .catch(() => sendResponse({ ok: false }))
     return true
   }
@@ -201,6 +205,15 @@ chrome.runtime.onMessage.addListener((request: ExtensionRequest, _sender, sendRe
     return true
   }
 
+  if (request.type === "set-translation-visibility") {
+    void chrome.tabs.query({ url: "https://app.slack.com/*" }).then((tabs) => Promise.all(
+      tabs.flatMap((tab) => tab.id === undefined
+        ? []
+        : [chrome.tabs.sendMessage(tab.id, request).catch(() => undefined)]),
+    )).then(() => sendResponse({ ok: true }))
+    return true
+  }
+
   if (request.type === "clear-translation-cache") {
     void clearTranslationCache()
       .then(() => sendResponse({ ok: true }))
@@ -211,10 +224,10 @@ chrome.runtime.onMessage.addListener((request: ExtensionRequest, _sender, sendRe
   return false
 })
 
-async function sendToActiveSlackTab(message: ContentRequest): Promise<void> {
+async function sendToActiveSlackTab<T>(message: ContentRequest): Promise<T> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
   if (!tab?.id || !tab.url?.startsWith("https://app.slack.com/")) throw new Error("No active Slack tab.")
-  await chrome.tabs.sendMessage(tab.id, message)
+  return await chrome.tabs.sendMessage(tab.id, message) as T
 }
 
 async function updateActionBadge(): Promise<void> {
@@ -232,6 +245,7 @@ async function updateActionBadge(): Promise<void> {
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   slackTranslationStats.delete(tabId)
+  for (const controller of activeTranslationRequests.get(tabId) ?? []) controller.abort()
   activeTranslationRequests.delete(tabId)
   void updateActionBadge()
 })
