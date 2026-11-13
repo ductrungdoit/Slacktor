@@ -12,6 +12,8 @@ Slacktor is a Chromium Manifest V3 extension that translates Slack Web messages
 through an OpenAI-compatible provider configured by the user. Translations are
 rendered directly below the original message without changing data in Slack.
 
+Website, changelog, and privacy policy: https://ductrungdoit.github.io/Slacktor/
+
 ## Features
 
 - Manual and automatic translation on `https://app.slack.com/*`.
@@ -31,6 +33,10 @@ rendered directly below the original message without changing data in Slack.
   IndexedDB.
 - Explicit data disclosure before Slack messages are read or processed.
 - No developer-operated AI backend, analytics, advertising, or remote code.
+- Popup with **Translate**, **History**, and **Settings** tabs. The header has a
+  **Show translations** switch, a link to the docs site, and a **Logs** button.
+- Light, dark, and system themes for the popup. Translations inside Slack follow
+  Slack's own light or dark theme.
 
 ## Requirements
 
@@ -66,7 +72,7 @@ npm install
 npm run build
 ```
 
-Load the generated `dist/` directory through `chrome://extensions`. After source
+Load the generated `dist/extension/` directory through `chrome://extensions`. After source
 changes, run `npm run build`, reload Slacktor, then hard-refresh or reopen the
 Slack tab so Chrome injects the new content script.
 
@@ -74,13 +80,19 @@ Slack tab so Chrome injects the new content script.
 
 1. Click the pinned Slacktor icon.
 2. Review and accept the Slack data disclosure.
-3. Open Settings and enter the provider endpoint, model, API key, and target
-   language. Optionally add custom translation instructions for terminology or
-   style preferences; Slacktor still enforces its required translation and
-   structured-output rules.
-4. Enable **Auto-translate messages** if desired.
-5. Click **Save configuration**.
-6. Approve Chrome access to the exact provider origin when prompted.
+3. Open **Settings > Provider** and enter the provider endpoint, model, API key,
+   and target language. Optionally add custom translation instructions for
+   terminology or style preferences; Slacktor still enforces its required
+   translation and structured-output rules.
+4. Click **Test provider** or **Save provider settings**.
+5. Approve Chrome access to the exact provider origin when prompted.
+6. Open **Settings > App** to turn **Enable Slacktor** and **Auto-translate
+   member messages** on or off, and to choose the popup theme.
+
+Provider changes apply only after you save them; leaving Settings with unsaved
+provider changes asks for confirmation. App settings apply instantly.
+Configuration import/export and **Clear translation cache** are also under
+**Settings > App**.
 
 Example OpenAI-compatible settings:
 
@@ -166,10 +178,12 @@ result without generating duplicate provider calls.
 
 ## Quick Translator
 
-Quick Translator sends text entered in the popup to the configured provider and
-shows Japanese and English output. It keeps local history for reuse and supports
-clearing both the current input and saved history. A completed source draft is
-cleared on the next popup open unless the user edits it after translation.
+Quick Translator sends text entered in the popup to the configured provider,
+translates it into the **Translate to** language, then into the **Then
+translate back to** language so you can check the meaning. It keeps local
+history for reuse and supports clearing both the current input and saved
+history. A completed source draft is cleared on the next popup open unless the
+user edits it after translation.
 
 ## Data And Privacy
 
@@ -188,26 +202,36 @@ Read the full [Privacy Policy](https://ductrungdoit.github.io/Slacktor/privacy-p
 ## Development
 
 ```powershell
-npm run check
+npm run dev
 npm run build
+npm run check
 npm run release
 ```
 
-- `npm run check`: type-check the extension.
-- `npm run build`: type-check and create a loadable extension in `dist/`.
+- `npm run dev`: start dev servers for both the extension and docs site concurrently.
+- `npm run dev:extension`: start dev server for the extension only.
+- `npm run dev:site`: serve the docs site from `apps/site/` at
+  `http://localhost:5173/Slacktor/`. Reload the page after editing components.
+- `npm run build`: type-check and build both the extension and docs site.
+- `npm run build:extension`: type-check and create a loadable extension in `dist/extension/`.
+- `npm run build:site`: prerender the docs site to static HTML in `dist/site/`.
+  GitHub Pages runs this on every push to `main` that touches the site.
+- `npm run check`: type-check the extension, docs site, and shared UI package.
 - `npm run release`: regenerate icons, build, and create the current versioned
   ZIP in `release/`.
 
 Slacktor relies on Slack's public DOM, attributes, URLs, and permalinks. Slack DOM
-changes may require selector updates in `src/content/slack-adapter.ts` or queue
-location detection in `src/content/message-observer.ts`.
+changes may require selector updates in `apps/extension/src/content/slack-adapter.ts` or queue
+location detection in `apps/extension/src/content/message-observer.ts`.
 
 ## Documentation And Support
 
-- [Architecture](docs/architecture.md)
-- [Privacy policy source](docs/privacy-policy.md)
-- [Chrome Web Store listing](docs/store-listing.md)
-- [Release checklist](docs/release-checklist.md)
+- [Website](https://ductrungdoit.github.io/Slacktor/): about, changelog, and
+  privacy policy. Source in [`site/`](site).
+- [Internal docs index](docs/README.md)
+- [Architecture overview](docs/architecture/overview.md)
+- [Chrome Web Store listing](docs/release/chrome-web-store-listing.md)
+- [Release checklist](docs/release/checklist.md)
 - [Report an issue](https://github.com/ductrungdoit/Slacktor/issues)
 
 ## License

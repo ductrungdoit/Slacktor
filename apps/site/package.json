@@ -1,0 +1,13 @@
+{
+  "name": "@slacktor/site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && node ../../scripts/build-site.mjs",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@slacktor/ui": "*"
+  }
+}
