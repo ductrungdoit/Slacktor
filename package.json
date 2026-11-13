@@ -1,20 +1,86 @@
 {
   "name": "slacktor",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "check": "tsc --noEmit",
+    "dev": "node scripts/dev.mjs",
+    "dev:extension": "npm run --workspace=@slacktor/extension dev",
+    "dev:site": "npm run --workspace=@slacktor/site dev",
+    "build": "npm run build:extension && npm run build:site",
+    "build:extension": "npm run --workspace=@slacktor/extension build",
+    "build:site": "npm run --workspace=@slacktor/site build",
+    "check": "tsc --noEmit -p apps/extension && tsc --noEmit -p apps/site && tsc --noEmit -p packages/ui",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "icons": "node scripts/generate-icons.mjs",
-    "release": "npm run icons && npm run build && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-release.ps1"
+    "release": "npm run icons && node scripts/package-release.mjs",
+    "prepare": "husky",
+    "lint-staged": "lint-staged"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
+    "@hookform/resolvers": "^5.9.1",
+    "@radix-ui/react-toast": "^1.2.23",
+    "cn": "^0.4.0",
+    "radix-ui": "^1.6.7",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-hook-form": "^7.89.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@crxjs/vite-plugin": "^2.2.0",
+    "@eslint/js": "^10.0.1",
+    "@radix-ui/react-checkbox": "^1.3.11",
+    "@radix-ui/react-dialog": "^1.1.23",
+    "@radix-ui/react-label": "^2.1.15",
+    "@radix-ui/react-scroll-area": "^1.2.18",
+    "@radix-ui/react-separator": "^1.1.15",
+    "@radix-ui/react-slot": "^1.3.3",
+    "@radix-ui/react-switch": "^1.3.7",
+    "@radix-ui/react-tabs": "^1.1.21",
+    "@radix-ui/react-tooltip": "^1.2.16",
+    "@tailwindcss/vite": "^4.3.3",
     "@types/chrome": "^0.0.307",
+    "@types/node": "^26.6.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^4.7.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "eslint": "^10.11.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.6",
+    "eslint-plugin-simple-import-sort": "^14.0.0",
+    "eslint-plugin-unused-imports": "^4.4.1",
+    "globals": "^17.12.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
+    "lucide-react": "^1.48.0",
+    "prettier": "^3.9.9",
+    "prettier-plugin-tailwindcss": "^0.8.1",
     "sharp": "^0.35.3",
+    "tailwind-merge": "^3.7.0",
+    "tailwindcss": "^4.3.3",
+    "tw-animate-css": "^1.4.0",
     "typescript": "^5.8.3",
+    "typescript-eslint": "^8.70.1",
     "vite": "^6.3.5"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,mjs}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,css,html,md,yml,yaml}": [
+      "prettier --write"
+    ]
   }
 }

@@ -1,0 +1,147 @@
+/*
+ * Slacktor design tokens shared by the popup (src/popup/index.css) and the
+ * documentation site (site/). Import this after "tailwindcss".
+ *
+ * Light tokens live on :root. Dark tokens apply when an ancestor has the
+ * `.dark` class; the popup sets it from the Light / Dark / System preference
+ * (src/popup/lib/theme-mode.ts). The site never sets `.dark`, so it stays light.
+ *
+ * The content-script overlay injected into Slack cannot use Tailwind and has
+ * its own palette in src/shared/theme.ts. Keep the purple primary in sync.
+ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: #ffffff;
+  --foreground: #1d1c1d;
+
+  --card: #ffffff;
+  --card-foreground: #1d1c1d;
+
+  --popover: #ffffff;
+  --popover-foreground: #1d1c1d;
+
+  --primary: #7b2fd0;
+  --primary-foreground: #ffffff;
+
+  --secondary: #f1f3f5;
+  --secondary-foreground: #1d1c1d;
+
+  --muted: #f8f8f8;
+  --muted-foreground: #616061;
+
+  --accent: #f3edfd;
+  --accent-foreground: #5b21b6;
+
+  --destructive: #c4314b;
+  --destructive-foreground: #ffffff;
+
+  --success: #007a5a;
+  --success-foreground: #ffffff;
+
+  --warning: #9b6a00;
+  --warning-foreground: #ffffff;
+
+  /* Logo mark background. Matches the icon artwork in scripts/generate-icons.mjs. */
+  --brand-gradient: linear-gradient(180deg, #872ada 0%, #5f309f 100%);
+
+  --border: #e2e2e2;
+  --input: #e2e2e2;
+  --ring: #7b2fd0;
+
+  --radius: 0.5rem;
+
+  color-scheme: light;
+}
+
+.dark {
+  --background: #17141c;
+  --foreground: #ece8f1;
+
+  --card: #201c26;
+  --card-foreground: #ece8f1;
+
+  --popover: #201c26;
+  --popover-foreground: #ece8f1;
+
+  --primary: #b794f6;
+  --primary-foreground: #17141c;
+
+  --secondary: #2a2631;
+  --secondary-foreground: #ece8f1;
+
+  --muted: #241f2a;
+  --muted-foreground: #a39fab;
+
+  --accent: #2a2233;
+  --accent-foreground: #e3d5fb;
+
+  --destructive: #f87171;
+  --destructive-foreground: #17141c;
+
+  --success: #34d399;
+  --success-foreground: #17141c;
+
+  --warning: #fbbf24;
+  --warning-foreground: #17141c;
+
+  --border: #332d3b;
+  --input: #3a3443;
+  --ring: #b794f6;
+
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+  }
+}
