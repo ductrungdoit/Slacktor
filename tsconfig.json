@@ -1,16 +1,19 @@
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "useDefineForClassFields": true,
-    "module": "ESNext",
-    "lib": ["ES2022", "DOM"],
-    "moduleResolution": "Bundler",
-    "allowImportingTsExtensions": false,
-    "verbatimModuleSyntax": true,
-    "strict": true,
-    "noEmit": true,
-    "skipLibCheck": true,
-    "types": ["chrome"]
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./apps/extension/src/popup/*"],
+      "@slacktor/ui": ["./packages/ui/src/index.ts"],
+      "@slacktor/ui/*": ["./packages/ui/src/*"]
+    }
   },
-  "include": ["src", "vite.config.ts"]
+  "include": [
+    "apps/extension/src",
+    "apps/extension/vite.config.ts",
+    "apps/site/src",
+    "apps/site/vite.config.ts",
+    "packages/ui/src",
+    "scripts"
+  ]
 }

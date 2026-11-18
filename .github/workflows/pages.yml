@@ -1,10 +1,15 @@
-name: Deploy privacy policy
+name: Deploy documentation site
 
 on:
   push:
     branches: [main]
     paths:
-      - "docs/**"
+      - "apps/site/**"
+      - "packages/ui/**"
+      - "public/icons/**"
+      - "scripts/build-site.mjs"
+      - "package.json"
+      - "package-lock.json"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -26,6 +31,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build site
+        run: npm run build:site
       - name: Configure Pages
         uses: actions/configure-pages@v5
         with:
@@ -33,7 +47,7 @@ jobs:
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs
+          path: dist/site
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4

@@ -1,0 +1,36 @@
+import { DEFAULT_SETTINGS_TARGET_LANGUAGE } from "./languages"
+
+export type ProviderSettings = {
+  extensionEnabled: boolean
+  baseUrl: string
+  apiKey: string
+  model: string
+  targetLanguage: string
+  customPrompt: string
+  autoTranslate: boolean
+  showTranslations: boolean
+  privacyConsent: boolean
+}
+
+const SETTINGS_KEY = "provider-settings"
+
+export const DEFAULT_PROVIDER_SETTINGS: ProviderSettings = {
+  extensionEnabled: false,
+  baseUrl: "",
+  apiKey: "",
+  model: "",
+  targetLanguage: DEFAULT_SETTINGS_TARGET_LANGUAGE,
+  customPrompt: "",
+  autoTranslate: true,
+  showTranslations: true,
+  privacyConsent: false,
+}
+
+export async function getProviderSettings(): Promise<ProviderSettings> {
+  const stored = await chrome.storage.local.get(SETTINGS_KEY)
+  return { ...DEFAULT_PROVIDER_SETTINGS, ...stored[SETTINGS_KEY] }
+}
+
+export async function saveProviderSettings(settings: ProviderSettings): Promise<void> {
+  await chrome.storage.local.set({ [SETTINGS_KEY]: settings })
+}

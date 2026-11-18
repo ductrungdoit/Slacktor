@@ -1,0 +1,46 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource-variable/inter";
+@import "../../../../packages/ui/src/theme.css";
+
+@source "../../../../packages/ui/src";
+
+/* Slacktor popup. Color tokens (light + dark) live in src/shared/theme.css. */
+@layer base {
+  /* Radix primitives (Button, Switch, Checkbox, Tabs, Select trigger, Dialog
+     close, ...) all render a native <button>. Browsers default that to an
+     arrow cursor, so restore the expected pointer cursor everywhere. */
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+/* Popup window sizing: fixed footprint, internal scroll per tab instead of the
+   old 350px -> 600px view-swap resize. Must match the root div's h-150 w-90
+   in App.tsx. overflow: hidden keeps the browser from ever adding its own
+   page-level scrollbar (which would steal width from the fixed 360px popup
+   and show up as a stray gap) — all scrolling happens in the inner
+   .overflow-y-auto regions instead. */
+html,
+body,
+#root {
+  width: 360px;
+  height: 600px;
+  overflow: hidden;
+}
+/* Radix Dialog wraps its content in react-remove-scroll, which locks body
+   scrolling and injects an inline padding-right/margin-right on <body> to
+   compensate for the scrollbar it assumes it's hiding. Our popup has no
+   page-level scrollbar to compensate for, so that inline style just shows up
+   as a stray gap on the right of #root whenever a dialog opens. Pin it to 0. */
+body {
+  padding-right: 0 !important;
+  margin-right: 0 !important;
+}
+body.preload,
+body.preload *,
+body.preload *::before,
+body.preload *::after {
+  animation: none !important;
+  transition: none !important;
+}
